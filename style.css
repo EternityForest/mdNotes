@@ -67,3 +67,30 @@ img {
     display: block;
     margin: 0 auto;
 }
+
+blockquote
+{
+    font-family: "Cormorant",Times,serif;;
+    color: rgb(50,50,50);
+    background-color(245,245,245);
+    border-color: rgb(220,220,220);
+    border-style: solid;
+    border-width: 1px;
+    border-radius: 0.5em;
+    font-style: italic;
+    font-size: 150%;
+    line-height: 80%;
+    padding: 0.2em;
+    margin:0.2em;
+}
+
+pre
+{
+    font-family: monospace;
+    color: rgb(70,70,70);
+    background-color(245,245,245);
+    border-color: lightgrey;
+    border-style: solid;
+    border-width: 1px;
+
+}

@@ -121,6 +121,8 @@ def initConfig(notespath):
     "Given the notes path, attempt to loaf a config object from that notes path and the user's configured notes file"
 
     default="""
+    [basic]
+    strftime = %b %d %I:%M%p %G
     [theme]
     css = ~/.mdnotes/style.css
     """
@@ -223,12 +225,22 @@ def findTodos(dir):
 
 class NoteToolBar(QWidget):
     "Represents the toolbar for a note."
-    def __init__(self,note):
+    def __init__(self,note,richtext=True):
         QWidget.__init__(self)
         self.edit = note.edit
         self.note = note
+        self.lop= QVBoxLayout()
+
         self.lo= QHBoxLayout()
-        self.setLayout(self.lo)
+        self.lo2= QHBoxLayout()
+        self.w= QWidget()
+        self.w2= QWidget()
+        self.w.setLayout(self.lo)
+        self.w2.setLayout(self.lo2)
+
+        self.setLayout(self.lop)
+        self.lop.addWidget(self.w)
+        self.lop.addWidget(self.w2)
 
         def save(d):
             self.note.save()
@@ -236,63 +248,98 @@ class NoteToolBar(QWidget):
         self.save.clicked.connect(save)
         self.lo.addWidget(self.save)
 
-        def bold(d):
-            self.edit.page().mainFrame().evaluateJavaScript("document.execCommand('bold');")
-        self.boldbutton = QPushButton("Bold")
-        self.boldbutton.clicked.connect(bold)
-        self.lo.addWidget(self.boldbutton)
+        if richtext:
+            def bold(d):
+                self.edit.page().mainFrame().evaluateJavaScript("document.execCommand('bold');")
+            self.boldbutton = QPushButton("Bold")
+            self.boldbutton.clicked.connect(bold)
+            self.lo.addWidget(self.boldbutton)
+
+            def ital(d):
+                self.edit.page().mainFrame().evaluateJavaScript("document.execCommand('italic');")
+            self.ital = QPushButton("Italic")
+            self.ital.clicked.connect(ital)
+            self.lo.addWidget(self.ital)
 
 
-        def h1(d):
-            if(len(self.edit.selectedText())< 80):
-                self.edit.page().mainFrame().evaluateJavaScript("document.execCommand('formatBlock',false,'h1');")
-        self.h1button = QPushButton("H1")
-        self.h1button.clicked.connect(h1)
-        self.lo.addWidget(self.h1button)
 
-        def h2(d):
-            if(len(self.edit.selectedText())< 80):
-                self.edit.page().mainFrame().evaluateJavaScript("document.execCommand('formatBlock',false,'h2');")
-        self.h2button = QPushButton("H2")
-        self.h2button.clicked.connect(h2)
-        self.lo.addWidget(self.h2button)
+            def h1(d):
+                if(len(self.edit.selectedText())< 80):
+                    self.edit.page().mainFrame().evaluateJavaScript("document.execCommand('formatBlock',false,'h1');")
+            self.h1button = QPushButton("H1")
+            self.h1button.clicked.connect(h1)
+            self.lo.addWidget(self.h1button)
 
-        def h3(d):
-            if(len(self.edit.selectedText())< 80):
-                self.edit.page().mainFrame().evaluateJavaScript("document.execCommand('formatBlock',false,'h3');")
-        self.h3button = QPushButton("H3")
-        self.h3button.clicked.connect(h3)
-        self.lo.addWidget(self.h3button)
+            def h2(d):
+                if(len(self.edit.selectedText())< 80):
+                    self.edit.page().mainFrame().evaluateJavaScript("document.execCommand('formatBlock',false,'h2');")
+            self.h2button = QPushButton("H2")
+            self.h2button.clicked.connect(h2)
+            self.lo.addWidget(self.h2button)
 
-        def h4(d):
-            if(len(self.edit.selectedText())< 80):
-                self.edit.page().mainFrame().evaluateJavaScript("document.execCommand('formatBlock',false,'h4');")
-        self.h3button = QPushButton("H4")
-        self.h3button.clicked.connect(h4)
-        self.lo.addWidget(self.h3button)
+            def h3(d):
+                if(len(self.edit.selectedText())< 80):
+                    self.edit.page().mainFrame().evaluateJavaScript("document.execCommand('formatBlock',false,'h3');")
+            self.h3button = QPushButton("H3")
+            self.h3button.clicked.connect(h3)
+            self.lo.addWidget(self.h3button)
 
-        def normal(d):
-            self.edit.page().mainFrame().evaluateJavaScript('document.execCommand("removeFormat");')
-        self.normal = QPushButton("Normal")
-        self.normal.clicked.connect(normal)
-        self.lo.addWidget(self.normal)
+            def h4(d):
+                if(len(self.edit.selectedText())< 80):
+                    self.edit.page().mainFrame().evaluateJavaScript("document.execCommand('formatBlock',false,'h4');")
+            self.h3button = QPushButton("H4")
+            self.h3button.clicked.connect(h4)
+            self.lo.addWidget(self.h3button)
 
-        def Timestamp(d):
-            t =datetime.datetime.now().strftime('%b %d %I:%M%p %G')
-            self.edit.page().mainFrame().evaluateJavaScript('document.execCommand("insertHTML",false,"' +t+ '");' )
-        self.ts = QPushButton("Timestamp")
-        self.ts.clicked.connect(Timestamp)
-        self.lo.addWidget(self.ts)
+            def code(d):
+                self.edit.page().mainFrame().evaluateJavaScript("document.execCommand('formatBlock',false,'PRE');")
+            self.code = QPushButton("Code")
+            self.code.clicked.connect(code)
+            self.lo2.addWidget(self.code)
 
-        def Image(d):
-            text, ok = QInputDialog.getText(self, 'New Image', 'Location(URL or file:/// address):')
-            if ok:
-                self.edit.page().mainFrame().evaluateJavaScript('document.execCommand("insertImage",false,"' +text+ '");' )
+            def quote(d):
+                self.edit.page().mainFrame().evaluateJavaScript("document.execCommand('formatBlock',false,'BLOCKQUOTE');")
+            self.quote = QPushButton("Quote")
+            self.quote.clicked.connect(quote)
+            self.lo2.addWidget(self.quote)
 
+            def normal(d):
+                self.edit.page().mainFrame().evaluateJavaScript('document.execCommand("removeFormat");')
+            self.normal = QPushButton("Normal")
+            self.normal.clicked.connect(normal)
+            self.lo2.addWidget(self.normal)
 
-        self.img = QPushButton("Image")
-        self.img.clicked.connect(Image)
-        self.lo.addWidget(self.img)
+            def Timestamp(d):
+                t =datetime.datetime.now().strftime(config.get("basic", "strftime",raw=True))
+                self.edit.page().mainFrame().evaluateJavaScript('document.execCommand("insertHTML",false,"' +t+ '");' )
+            self.ts = QPushButton("Timestamp")
+            self.ts.clicked.connect(Timestamp)
+            self.lo2.addWidget(self.ts)
+
+            def Image(d):
+                text, ok = QInputDialog.getText(self, 'New Image', 'Location(URL or file:/// address):')
+                if ok:
+                    self.edit.page().mainFrame().evaluateJavaScript('document.execCommand("insertImage",false,"' +text+ '");' )
+            self.img = QPushButton("Image")
+            self.img.clicked.connect(Image)
+            self.lo2.addWidget(self.img)
+
+            def Link(d):
+                text, ok = QInputDialog.getText(self, 'New Link', 'Location(URL or file:/// address):')
+                if ok:
+                    self.edit.page().mainFrame().evaluateJavaScript('document.execCommand("createLink",false,"' +text+ '");' )
+            self.link = QPushButton("Selection>Link")
+            self.link.clicked.connect(Link)
+            self.lo2.addWidget(self.link)
+
+        else:
+            def Timestamp(d):
+                t =datetime.datetime.now().strftime(config.get("basic", "strftime",raw=True))
+                self.edit.insertPlainText(t)
+            self.ts = QPushButton("Timestamp")
+            self.ts.clicked.connect(Timestamp)
+            self.lo.addWidget(self.ts)
+
 
 
 class Note(QWidget):
@@ -402,35 +449,35 @@ class Note(QWidget):
         if os.path.isfile(self.path):
             with open(self.path,"rb") as f:
                 s = f.read()
-        #now we are going to use pandoc to convert to html
-        doc = pandoc.Document()
+            #now we are going to use pandoc to convert to html
+            doc = pandoc.Document()
 
-        #Figure out the input format. We back things up and archive them by appenting a Timestamp
-        #to the end or else a ~. That function strips both of those things.
-        if striptrailingnumbers(self.path).endswith(".html"):
-            doc.html = s
-            self.edit.page().setContentEditable(False)
+            #Figure out the input format. We back things up and archive them by appenting a Timestamp
+            #to the end or else a ~. That function strips both of those things.
+            if striptrailingnumbers(self.path).endswith(".html"):
+                doc.html = s
+                self.edit.page().setContentEditable(False)
 
-        #The special html.ro lets us have read only HTML used for handy calculators and stuff.
-        elif striptrailingnumbers(self.path).endswith(".html.ro"):
-            doc.html = s
-            self.edit.page().setContentEditable(False)
+            #The special html.ro lets us have read only HTML used for handy calculators and stuff.
+            elif striptrailingnumbers(self.path).endswith(".html.ro"):
+                doc.html = s
+                self.edit.page().setContentEditable(False)
 
-        elif striptrailingnumbers(self.path).endswith(".md"):
-            doc.markdown = s
+            elif striptrailingnumbers(self.path).endswith(".md"):
+                doc.markdown = s
 
-        elif striptrailingnumbers(self.path).endswith(".rst"):
-            doc.rst = s
-        else:
-            raise RuntimeError("Bad filetype")
-        html = doc.html.decode("utf-8")
+            elif striptrailingnumbers(self.path).endswith(".rst"):
+                doc.rst = s
+            else:
+                raise RuntimeError("Bad filetype")
+            html = doc.html.decode("utf-8")
 
-        #Add the CSS file before the HTML
-        d="<style>"+style+"</style>"
-        self.header_size = len(d)
-        d += html
+            #Add the CSS file before the HTML
+            d="<style>"+style+"</style>"
+            self.header_size = len(d)
+            d += html
 
-        self.edit.setHtml(d, QUrl("file://"+self.path) if self.path else QUrl("file:///"))
+            self.edit.setHtml(d, QUrl("file://"+self.path) if self.path else QUrl("file:///"))
 
 class TxtNote(Note):
     def __init__(self,path,notebook):
@@ -464,7 +511,7 @@ class TxtNote(Note):
         #Put the widgets together
         self.lo = QVBoxLayout()
         self.setLayout(self.lo)
-        self.tools= NoteToolBar(self)
+        self.tools= NoteToolBar(self,richtext=False)
         self.lo.addWidget(self.tools)
         self.lo.addWidget(self.edit)
 
@@ -589,8 +636,9 @@ class Notebook(QTabWidget):
         self.widget(i).save()
         self.removeTab(i)
 
-    def open(self,path):
-        "Open a new tab given a path to a supported file"
+    def open(self,path,raw=False,create=False):
+        "Open a new tab given a path to a supported file"\
+
         if not path.startswith("mdnotes://"):
             pass
         else:
@@ -605,16 +653,14 @@ class Notebook(QTabWidget):
                         self.setCurrentIndex(i)
             else:
                 #If the file exists, open it and go to the tab.
-                if os.path.isfile(path):
-                    if not striptrailingnumbers(path).endswith(".txt"):
-                        edit = Note(path,self)
-                    else:
-                        edit = TxtNote(path,self)
-                    self.addTab(edit,os.path.basename(path))
-                    self.setCurrentIndex(self.count()-1)
-                    openfiletabs[path] = edit
+                if not (raw or striptrailingnumbers(path).endswith(".txt")):
+                    edit = Note(path,self)
                 else:
-                    raise RuntimeError("No such file "+path)
+                    edit = TxtNote(path,self)
+                self.addTab(edit,os.path.basename(path))
+                self.setCurrentIndex(self.count()-1)
+                openfiletabs[path] = edit
+
         except:
             logging.exception("Could not open file "+path)
 
@@ -678,6 +724,7 @@ class Browser(QWidget):
             newf= QAction("New Folder",self)
             newfile= QAction("New File",self)
             search= QAction("Search",self)
+            editr= QAction("Edit Raw",self)
 
             menu.addAction(newf)
             menu.addAction(newmd)
@@ -685,6 +732,7 @@ class Browser(QWidget):
             menu.addAction(delete)
             menu.addAction(archive)
             menu.addAction(search)
+            menu.addAction(editr)
 
             t = time.time()
             k =menu.exec_(self.mapToGlobal(point))
@@ -776,7 +824,10 @@ class Browser(QWidget):
                     html+= '</dl>'
                     self.nb.openVirtual(html=html,title="Search Results")
 
-
+            #Uer has chosen to create one folder
+            if k == editr:
+                if  os.path.isfile(path):
+                    self.nb.open(path,raw=True)
 
 
         self.fv.customContextMenuRequested.connect(onCustomContextMenu);

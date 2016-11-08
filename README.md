@@ -11,7 +11,9 @@ mdNotes internally uses pandoc to load and save markdown and so can be modified 
 
 Because mdNotes is designed for note-taking and not programming, it will automatically save all open notes when you close the program or close a tab.
 
-mdNotes also has limited support for reStructuredText files.
+mdNotes also supports plain .txt, with limited support for reStructuredText files and HTML.
+
+Any HTML page can be opened in read-only mode with full webkit features. Also, any file can be edited as a raw text file.
 
 Although mdNotes is primarily hierarchal, links to local files are fully supported. mdNotes uses webkit for rendering, so you can freely drag and drop images into pages(images from websites will automatically be downloaded into a local folder in the same directory as the note.)
 
@@ -22,12 +24,23 @@ mdNotes depends on python3, pyqt5, pyqt5 webkit, and send2trash. mdNotes also de
 
 On Ubuntu:
 
-    sudo apt-get install python3-pyqt5 python3-pyqt5.qtwebkit
+    sudo apt-get install python3-pyqt5 python3-pyqt5.qtwebkit
     sudo pip3 install send2trash
 
 then simply run `__main__.py`
 
 mdNotes expects either for it's first command line argument to be a path to the notebook folder you want to edit, or for there to be a file at ~/.mdnotes/notebooks.txt that contains the path of the folder you want to be your notes folder.
+
+Config Files
+------------
+
+mdNotes will look for "~/.mdnotes/mdnotes.conf" and then for notebookfolder/notebook.conf (values in the second one take precedence over the first one)
+
+The format is a normal INI style file, with the following format:
+
+    [basic]
+    #Use this to specify an alternate time formatting for the timestamp button
+    strftime =  %b %d %I:%M%p %G
 
 WARNING
 -------
@@ -39,4 +52,4 @@ Theming and customization
 
 Because mdNotes renders with webkit, you can put a style.css folder in your notes folder that will be applied to the text. You have to restart mdNotes for a new theme to work.
 
-You can also put a global theme in  ~/.mdnotes/style.css, however themes directly in the notebook will take precedence.
+You can also put a global theme in  ~/.mdnotes/style.css, however themes directly in the notebook will take precedence.
