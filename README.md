@@ -11,7 +11,7 @@ Because mdNotes is designed for notetaking and not programming, it will automati
 
 mdNotes also has limited support for reStructuredText files.
 
-although mdNotes is primarily hierarchal, links to local files are fully supported. mdNotes uses webkit for rendering, so you can freely drag and drop images into pages(images from websites will automatically be downloaded into a local folder in the same directory as the note.
+Although mdNotes is primarily hierarchal, links to local files are fully supported. mdNotes uses webkit for rendering, so you can freely drag and drop images into pages(images from websites will automatically be downloaded into a local folder in the same directory as the note.
 
 Installation
 ------------
@@ -34,7 +34,7 @@ WARNING
 -------
 Don't use this in folders containing important notes. This is pre-alpha software.
 
-Theming and customizatio
+Theming and customization
 ------------------------
 
 Because mdNotes renders with webkit, you can put a style.css folder in your notes folder that will be applied to the text. You have to restart mdNotes for a new theme to work.
