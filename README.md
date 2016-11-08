@@ -1,6 +1,8 @@
 mdNotes: Simple Markdown Notetaking
 ===================================
 
+![](./screenshot.jpg)
+
 mdNotes is a WYSYWIG markdown editor written in pyqt5 for python3. Unlike some other md editors, mdNotes does not require extra metadata in md files, and uses the filesystem hierarchy itself for storing notes, for maximum compatibility wiht other tools, especially android phones when using folder sync systems.
 
 mdNotes is not even currently alpha quality yet.
@@ -16,15 +18,12 @@ Although mdNotes is primarily hierarchal, links to local files are fully support
 Installation
 ------------
 
-mdNotes depends on python3, pyqt5, pyqt5 webkit, and send2trash. mdNotes also depends on pyandoc which is included,
-but needs to have pandoc installed to work.
+mdNotes depends on python3, pyqt5, pyqt5 webkit, and send2trash. mdNotes also depends on pyandoc which is included, but needs to have pandoc installed to work.
 
 On Ubuntu:
 
-```
-sudo apt-get install python3-pyqt5 python3-pyqt5.qtwebkit
-sudo pip3 install send2trash
-```
+    sudo apt-get install python3-pyqt5 python3-pyqt5.qtwebkit
+    sudo pip3 install send2trash
 
 then simply run `__main__.py`
 
@@ -32,10 +31,11 @@ mdNotes expects either for it's first command line argument to be a path to the 
 
 WARNING
 -------
-Don't use this in folders containing important notes. This is pre-alpha software.
+
+Don't use this in folders containing important notes. This is pre-alpha software. That being said, this readme file is maintained using mdNotes itself.
 
 Theming and customization
-------------------------
+-------------------------
 
 Because mdNotes renders with webkit, you can put a style.css folder in your notes folder that will be applied to the text. You have to restart mdNotes for a new theme to work.
 

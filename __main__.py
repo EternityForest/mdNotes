@@ -37,6 +37,77 @@ from PyQt5.QtCore import Qt
 
 from html.parser import HTMLParser
 
+# global lists of diles that are open in any tab so we don't open them twice.
+#Global instead of with the notebook so that we can later add more places a note can be open.
+openfiletabs = {}
+
+supportedTypes = ["*.md", "*.rst", "*.html", "*.html", "*.html.ro"]
+builtinsdir = os.path.dirname(__file__)
+
+def getNotebookLocation():
+        "Get the notebook file either from a config file or from the command line arg"
+        if not len(sys.argv)>1:
+            with open(os.path.expanduser("~/.mdnotes/notebooks.txt")) as f:
+                t = f.read()
+
+            t= t.replace("\r","").split("\n")
+
+            return os.path.join(os.path.expanduser(t[0]))
+
+            if notespath.endswith("/"):
+                return notespath[:-1]
+        else:
+            return sys.argv[1]
+
+def initCSS(notespath,config):
+    "Setup the CSS reloader watcher ad load the CSS. Requires the notes path and the config object. and returns the css text"
+    global csswatcher
+    css =interpretcnfpath(config.get("theme","css"))
+
+
+    #Read the user's donfigured CSS if it exists
+    if os.path.exists(css):
+        with open(css) as f:
+            style=f.read()
+        csspath = css
+
+    #Read the notebook specific style.css which overrides that if it exists
+    if os.path.exists(os.path.join(notespath,"style.css")):
+        with open(os.path.join(notespath,"style.css")) as f:
+            style=f.read()
+        csspath = os.path.join(notespath,"style.css")
+
+    #Handle auto reloading the CSS theme
+    def rlcss(*args):
+        global style
+        #Read the notebook specific style.css which overrides that if it exists
+        if os.path.exists(csspath):
+            with open(csspath) as f:
+                style=f.read()
+
+    #Watch the file so we can auto reload
+    csswatcher = QFileSystemWatcher()
+    csswatcher.addPath(csspath)
+    csswatcher.fileChanged.connect(rlcss)
+    return style
+
+def initConfig(notespath):
+    "Given the notes path, attempt to loaf a config object from that notes path and the user's configured notes file"
+
+    default="""
+    [theme]
+    css = ~/.mdnotes/style.css
+    """
+
+    config = ConfigParser(allow_no_value=True)
+    config.read_string(default)
+    config.read([os.path.expanduser("~/.mdnotes/mdnotes.conf"),os.path.join(notespath, 'notebook.conf')])
+    return config
+
+def html_resolve_paths(h):
+    "Let html.ro stuff acess builtinsdir"
+    return h.replace('$MDEDITBUILTINS', builtinsdir)
+
 class MyHTMLParser(HTMLParser):
     "Class used in downloadAllImages"
     def __init__(self):
@@ -89,15 +160,6 @@ def striptrailingnumbers(t):
         t = t[:-1]
     return t
 
-
-
-def onClose():
-    "Save everything on shutdown"
-    for i in range(tabs.count()):
-        tabs.widget(i).onClose()
-        if tabs.widget(i).path in openfiletabs:
-            del openfiletabs[tabs.widget(i).path]
-atexit.register(onClose)
 
 
 class NoteToolBar(QWidget):
@@ -177,7 +239,9 @@ class NoteToolBar(QWidget):
 class Note(QWidget):
     def __init__(self,path,notebook):
         """
-        Class representing the actual tab pane for a note file, and the save/load logic
+        Class representing the actual tab pane for a note file, including the editor,
+        the toolbar and the save/load logic.
+
         path is the path to the file(which does not need to exist yet)
         notebook must be the Notebook instance the note will be a part of
 
@@ -190,8 +254,14 @@ class Note(QWidget):
         self.edit = QWebView()
         self.edit.page().setContentEditable(True)
         self.edit.settings().setAttribute(QWebSettings.JavascriptEnabled,True)
+
         def openLink(url):
-            self.notebook.open(os.path.join(os.path.dirname(self.path),url.toString() ))
+            if not url.toString().startswith("mdnotes://"):
+                self.notebook.open(os.path.join(os.path.dirname(self.path),url.toString() ))
+            else:
+                #Open knows how to handle these directly
+                self.notebook.open(url.toString())
+
         self.edit.page().setLinkDelegationPolicy(QWebPage.DelegateAllLinks)
         self.edit.page().linkClicked.connect(openLink)
 
@@ -228,8 +298,14 @@ class Note(QWidget):
         #to the end or else a ~. That function strips both of those things.
         if striptrailingnumbers(self.path).endswith(".html"):
             doc.html = s
+            self.edit.page().setContentEditable(False)
 
-        if striptrailingnumbers(self.path).endswith(".md"):
+        #The special html.ro lets us have read only HTML used for handy calculators and stuff.
+        elif striptrailingnumbers(self.path).endswith(".html.ro"):
+            doc.html = s
+            self.edit.page().setContentEditable(False)
+
+        elif striptrailingnumbers(self.path).endswith(".md"):
             doc.markdown = s
 
         elif striptrailingnumbers(self.path).endswith(".rst"):
@@ -239,6 +315,7 @@ class Note(QWidget):
 
         #Add the CSS file before the HTML
         d="<style>"+style+"</style>"
+        self.header_size = len(d)
         d += doc.html.decode("utf-8")
 
         self.edit.setHtml(d,QUrl("file://"+self.path))
@@ -250,6 +327,11 @@ class Note(QWidget):
         self.save()
 
     def save(self):
+        #Readonly html file support
+        if self.path.endswith(".ro"):
+            return
+        if self.path.endswith(".html"):
+            return
         "Save the file if it needs saving"
         if not self.edit.page().isModified():
             return
@@ -267,7 +349,8 @@ class Note(QWidget):
 
         #Again, pandoc to convert to the proper format
         doc = pandoc.Document()
-        doc.html = downloadAllImages(self.edit.page().mainFrame().toHtml(),self.path).encode("utf-8")
+        h = downloadAllImages(self.edit.page().mainFrame().toHtml(),self.path).encode("utf-8")
+        doc.html = h
 
         if  striptrailingnumbers(self.path).endswith("md"):
             with open(self.path,"wb") as f:
@@ -276,10 +359,6 @@ class Note(QWidget):
         if  striptrailingnumbers(self.path).endswith("rst"):
             with open(self.path,"wb") as f:
                 f.write(doc.rst)
-
-        if  striptrailingnumbers(self.path).endswith("html"):
-            with open(self.path,"wb") as f:
-                f.write(doc.html)
 
         if buf and os.path.isfile(buf):
             os.remove(buf)
@@ -299,11 +378,15 @@ class Note(QWidget):
 
 
 class Notebook(QTabWidget):
-    "Class representing the tabbed area in which notes are viewed"
+    """
+    Class representing the tabbed area in which notes are viewed.
+    """
     def __init__(self):
         QTabWidget.__init__(self)
         self.setTabsClosable(True)
         self.tabCloseRequested.connect(self.closehandler)
+        atexit.register(self.onExit)
+
 
     def closehandler(self,i):
         "Handle a user clicking a close tab button"
@@ -314,6 +397,11 @@ class Notebook(QTabWidget):
 
     def open(self,path):
         "Open a new tab given a path to a supported file"
+        if not path.startswith("mdnotes://"):
+            pass
+        else:
+            path =path[len("mdnotes://"):]
+            path = os.path.join(builtinsdir, path)
         try:
             #Don't allow the user to open a file that already is open
             #If they try, just go to that tab
@@ -326,16 +414,23 @@ class Notebook(QTabWidget):
                 if os.path.isfile(path):
                     edit = Note(path,self)
                     self.addTab(edit,os.path.basename(path))
-                    self.setCurrentIndex(tabs.count()-1)
+                    self.setCurrentIndex(self.count()-1)
                     openfiletabs[path] = edit
         except:
             logging.exception("Could not open file "+path)
 
-openfiletabs = {}
+    def onExit(self):
+        "Save everything on shutdown"
+        for i in range(self.count()):
+            self.widget(i).onClose()
+            if self.widget(i).path in openfiletabs:
+                del openfiletabs[self.widget(i).path]
+
 
 class Browser(QWidget):
     "Class representing the file browser tree and associated command buttons and menus"
     def __init__(self, book):
+        "Book must be an associated notebook that this Browser is 'controlling'"
         self.nb = book
         QWidget.__init__(self)
         self.lo = QVBoxLayout()
@@ -343,7 +438,7 @@ class Browser(QWidget):
 
         #SEtup file system model
         self.files = QFileSystemModel()
-        self.files.setNameFilters(["*.md", "*.rst"])
+        self.files.setNameFilters(supportedTypes)
         self.files.setRootPath(notespath)
 
         #Setup the view over that
@@ -370,11 +465,13 @@ class Browser(QWidget):
             menu = QMenu()
             delete = QAction("Delete",self)
             archive = QAction("Archive",self)
-            newmd = QAction("New Note",self)
+            newmd = QAction("New Note(md)",self)
             newf= QAction("New Folder",self)
+            newfile= QAction("New File",self)
 
             menu.addAction(newf)
             menu.addAction(newmd)
+            menu.addAction(newfile)
             menu.addAction(delete)
             menu.addAction(archive)
 
@@ -421,25 +518,39 @@ class Browser(QWidget):
                     else:
                         os.rename(path,os.path.dirname(newp)+"."+str(time.time())+os.path.basename(newp))
 
-            #User has chosen to create file
+            #User has chosen to create note
             if k == newmd:
                     path = self.files.filePath(i) or notespath
-                    if os.path.isdir(path):
-                        text, ok = QInputDialog.getText(self, 'New Note', 'Name:')
-                        newp = os.path.join(path,text+".md")
-                        if ok and not os.path.exists(newp):
-                            with open(newp, "w") as f:
-                                f.write("# Heading\ntext content")
-                        tabs.open(newp)
+                    if not os.path.isdir(path):
+                        path = os.path.dirname(path)
+                    text, ok = QInputDialog.getText(self, 'New Note', 'Name(no extension needed):')
+                    newp = os.path.join(path,text+".md")
+                    if ok and not os.path.exists(newp):
+                        with open(newp, "w") as f:
+                            f.write("# Heading\ntext content")
+                    self.nb.open(newp)
+
+            #User has chosen to create file
+            if k == newfile:
+                    path = self.files.filePath(i) or notespath
+                    if not os.path.isdir(path):
+                        path = os.path.dirname(path)
+                    text, ok = QInputDialog.getText(self, 'New File', 'Name(including extension):')
+                    newp = os.path.join(path,text)
+                    if ok and not os.path.exists(newp):
+                        with open(newp, "w") as f:
+                            f.write("")
+                    self.nb.open(newp)
 
             #Uer has chosen to create one folder
             if k == newf:
                     path = self.files.filePath(i) or notespath
-                    if os.path.isdir(path):
-                        text, ok = QInputDialog.getText(self, 'New Folder', 'Name:')
-                        newp = os.path.join(path,text)
-                        if ok and not os.path.exists(newp):
-                            os.mkdir(newp)
+                    if not os.path.isdir(path):
+                        path = os.path.dirname(path)
+                    text, ok = QInputDialog.getText(self, 'New Folder', 'Name:')
+                    newp = os.path.join(path,text)
+                    if ok and not os.path.exists(newp):
+                        os.mkdir(newp)
 
 
         self.fv.customContextMenuRequested.connect(onCustomContextMenu);
@@ -449,92 +560,82 @@ class Browser(QWidget):
     def dblclk(self, ind):
         self.nb.open(self.files.filePath(ind))
 
+style="""
+img
+{
+max-width:96%;
+max-height:45em;
+}
+h1
+{
+text-align:center;
+}
+h2
+{
+text-align:center;
+}
+h3
+{
+text-align:center;
+}
+h4
+{
+text-align:center;
+}
+"""
+
+
+
+
+class App(QMainWindow):
+    def __init__(self):
+        QMainWindow.__init__(self)
+        self.setWindowTitle('mdNotes')
+
+        #Setup menu bar
+        self.menubar = self.menuBar()
+        self.fileMenu = self.menubar.addMenu('&File')
+        self.tools = self.menubar.addMenu('&Tools')
+        self.help = self.menubar.addMenu('&Help')
+        showabout = QAction('About', self)
+        def f(*a):
+            self.tabs.open("mdnotes://about.html")
+        showabout.triggered.connect(f)
+
+        #Make a folder for each of our builtins in the builtins folder. Right now it's just an example though
+        for i in [i for i in os.listdir(os.path.join(os.path.dirname(__file__),'builtins')) if os.path.isfile(os.path.join(os.path.dirname(__file__),'builtins',i))]:
+            a = QAction(i[:-8], self)
+            def f(*a):
+                self.tabs.open(os.path.join(os.path.dirname(__file__),'builtins',i))
+            a.triggered.connect(f)
+            self.tools.addAction(a)
+        self.help.addAction(showabout)
+
+
+
+        self.split = QSplitter()
+        self.setCentralWidget(self.split)
+        self.tabs = Notebook()
+        self.browser = Browser(self.tabs)
+        self.split.addWidget(self.browser)
+
+        self.split.addWidget(self.tabs)
+        self.split.setSizes([250,900])
 
 if __name__ == '__main__':
-    #Get the notebook file either from a config file or from the command line arg
-    if not len(sys.argv)>1:
-        with open(os.path.expanduser("~/.mdnotes/notebooks.txt")) as f:
-            t = f.read()
 
-        t= t.replace("\r","").split("\n")
-
-        notespath = os.path.join(os.path.expanduser(t[0]))
-
-        if notespath.endswith("/"):
-            notespath=notespath[:-1]
-    else:
-        notespath=sys.argv[1]
-
-
-
-    style="""
-    img
-    {
-    max-width:96%;
-    max-height:45em;
-    }
-    h1
-    {
-    text-align:center;
-    }
-    h2
-    {
-    text-align:center;
-    }
-    h3
-    {
-    text-align:center;
-    }
-    h4
-    {
-    text-align:center;
-    }
-    """
-
-
-
-    default="""
-    [theme]
-    css = ~/.mdnotes/style.css
-    """
-
-    config = ConfigParser(allow_no_value=True)
-    config.read_string(default)
-    config.read([os.path.expanduser("~/.mdnotes/default.conf"),os.path.join(notespath, 'notebook.conf')])
-
-    css =interpretcnfpath(config.get("theme","css"))
-
-
-    #Read the user's donfigured CSS if it exists
-    if os.path.exists(css):
-        with open(css) as f:
-            style=f.read()
-
-    #Read the notebook specific style.css which overrides that if it exists
-    if os.path.exists(os.path.join(notespath,"style.css")):
-        with open(os.path.join(notespath,"style.css")) as f:
-            style=f.read()
+    #Get the user's chosen notebook folder
+    notespath =getNotebookLocation()
+    #Find and get the config file
+    config= initConfig(notespath)
+    #Find and get the CSS
+    style=initCSS(notespath,config)
 
      #Set up the top level UI
     app = QApplication(sys.argv)
-    w = QMainWindow()
+    app.setStyleSheet(style)
 
-    w.resize(600, 400)
-    w.move(300, 300)
-
-
-    w.setWindowTitle('mdNotes')
-    menubar = w.menuBar()
-    fileMenu = menubar.addMenu('&File')
+    w = App()
     w.show()
 
-
-    split = QSplitter()
-    w.setCentralWidget(split)
-    tabs = Notebook()
-    browser = Browser(tabs)
-    split.addWidget(browser)
-
-    split.addWidget(tabs)
-    split.setSizes([250,900])
     sys.exit(app.exec_())

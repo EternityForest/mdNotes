@@ -1,26 +1,69 @@
+QTreeView {
+    background-color: rgb(235,235,228);
+ }
+
+
+
+ ::-webkit-scrollbar {
+    width: 12px;
+}
+
+::-webkit-scrollbar-track {
+    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    border-radius: 10px;
+    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.5);
+}
+
 img
 {
 max-width:96%;
 max-height:45em;
 }
+
 h1
 {
 text-align:center;
+font-family: Times, serif;
+
 }
+
+
 h2
 {
 text-align:center;
+color:rgb(60,60,60);
+font-family: Times, serif;
 }
+
+
 h3
 {
 text-align:center;
+color:rgb(80,80,80);
+font-family: Times, serif;
+
+
 }
 h4
 {
 text-align:center;
+color:rgb(90,90,90);
+font-family: Times, serif;
+
 }
 
 body
 {
-font-family: "Times New Roman", Times, serif;
+background-color: : rgb(250,250,245);
+color: rgb(40,30,25);
+font-family: """Linux Libertine", Times, serif;
+}
+
+img {
+    display: block;
+    margin: 0 auto;
 }
