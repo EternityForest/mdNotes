@@ -41,7 +41,7 @@ from html.parser import HTMLParser
 #Global instead of with the notebook so that we can later add more places a note can be open.
 openfiletabs = {}
 
-supportedTypes = ["*.md", "*.rst", "*.html", "*.html", "*.html.ro"]
+supportedTypes = ["*.md", "*.rst", "*.html", "*.html", "*.html.ro", "*.txt"]
 builtinsdir = os.path.dirname(__file__)
 
 defaultstyle="""
@@ -82,6 +82,8 @@ def getNotebookLocation():
                 return notespath[:-1]
         else:
             return sys.argv[1]
+
+
 
 def initCSS(notespath,config):
     "Setup the CSS reloader watcher ad load the CSS. Requires the notes path and the config object. and returns the css text"
@@ -187,22 +189,37 @@ def striptrailingnumbers(t):
 
 
 
-def searchDir(dir,pattern):
-    r=[]
-    try:
+def searchDir(dir,pattern,all=False):
         for d, dirs,files in os.walk(dir):
-            for i in files:
-                if not i.endswith(".md"):
-                    continue
-                fn = os.path.join(d,i)
-                with open(fn) as f:
-                    text = f.read()
-                x = re.search(pattern, text, flags=re.MULTILINE)
-                if x:
-                    r.append((fn,x.group(0)))
-        return r
-    except:
-        logging.exception("Search Failed")
+            try:
+                for i in files:
+                        if not i.endswith(".md"):
+                            continue
+                        fn = os.path.join(d,i)
+                        with open(fn) as f:
+                            text = f.read(2*10**6)
+                        if all:
+                            x = re.findall(pattern, text, flags=re.MULTILINE)
+                            print("op",x)
+                        else:
+                            x = re.search(pattern, text, flags=re.MULTILINE)
+
+                        if not all:
+                            if x:
+                                yield (fn,x.groups(0))
+                        else:
+                            if x:
+                                yield (fn,[i[0] for i in x] if isinstance(x[0],tuple) else x)
+
+            except:
+                logging.exception("Searching "+i+" Failed")
+
+
+
+def findTodos(dir):
+    #r = searchDir(dir,"[ ( ?)]",all=True)
+    r = searchDir(dir,"^(.*((TODO)|(Todo)|(todo)):.*)$",all=True)
+    return r
 
 class NoteToolBar(QWidget):
     "Represents the toolbar for a note."
@@ -279,7 +296,7 @@ class NoteToolBar(QWidget):
 
 
 class Note(QWidget):
-    def __init__(self,path,notebook,html=None):
+    def __init__(self,path,notebook):
         """
         Class representing the actual tab pane for a note file, including the editor,
         the toolbar and the save/load logic.
@@ -336,40 +353,7 @@ class Note(QWidget):
         self.lo.addWidget(self.tools)
         self.lo.addWidget(self.edit)
 
-        if not html:
-            if os.path.isfile(self.path):
-                with open(self.path,"rb") as f:
-                    s = f.read()
-            #now we are going to use pandoc to convert to html
-            doc = pandoc.Document()
-
-            #Figure out the input format. We back things up and archive them by appenting a Timestamp
-            #to the end or else a ~. That function strips both of those things.
-            if striptrailingnumbers(self.path).endswith(".html"):
-                doc.html = s
-                self.edit.page().setContentEditable(False)
-
-            #The special html.ro lets us have read only HTML used for handy calculators and stuff.
-            elif striptrailingnumbers(self.path).endswith(".html.ro"):
-                doc.html = s
-                self.edit.page().setContentEditable(False)
-
-            elif striptrailingnumbers(self.path).endswith(".md"):
-                doc.markdown = s
-
-            elif striptrailingnumbers(self.path).endswith(".rst"):
-                doc.rst = s
-            else:
-                raise RuntimeError("Bad filetype")
-            html = doc.html.decode("utf-8")
-
-        #Add the CSS file before the HTML
-        d="<style>"+style+"</style>"
-        self.header_size = len(d)
-        d += html
-
-        self.edit.setHtml(d, QUrl("file://"+self.path) if self.path else QUrl("file:///"))
-
+        self.reload()
 
     def onClose(self):
         "Handle closing the tab or the whole program"
@@ -413,17 +397,112 @@ class Note(QWidget):
         if buf and os.path.isfile(buf):
             os.remove(buf)
 
-    #TODO: un-duplicate the load code. Also, this doesn't check format. bad.
     def reload(self,dummy=True):
         "Reload the file from disk"
         if os.path.isfile(self.path):
             with open(self.path,"rb") as f:
                 s = f.read()
-            doc = pandoc.Document()
+        #now we are going to use pandoc to convert to html
+        doc = pandoc.Document()
+
+        #Figure out the input format. We back things up and archive them by appenting a Timestamp
+        #to the end or else a ~. That function strips both of those things.
+        if striptrailingnumbers(self.path).endswith(".html"):
+            doc.html = s
+            self.edit.page().setContentEditable(False)
+
+        #The special html.ro lets us have read only HTML used for handy calculators and stuff.
+        elif striptrailingnumbers(self.path).endswith(".html.ro"):
+            doc.html = s
+            self.edit.page().setContentEditable(False)
+
+        elif striptrailingnumbers(self.path).endswith(".md"):
             doc.markdown = s
+
+        elif striptrailingnumbers(self.path).endswith(".rst"):
+            doc.rst = s
+        else:
+            raise RuntimeError("Bad filetype")
+        html = doc.html.decode("utf-8")
+
+        #Add the CSS file before the HTML
         d="<style>"+style+"</style>"
-        d += doc.html.decode("utf-8")
-        self.edit.setHtml(d,QUrl("file://"+self.path))
+        self.header_size = len(d)
+        d += html
+
+        self.edit.setHtml(d, QUrl("file://"+self.path) if self.path else QUrl("file:///"))
+
+class TxtNote(Note):
+    def __init__(self,path,notebook):
+        """
+        Class representing the actual tab pane for a plain .txt note file, including the editor,
+        the toolbar and the save/load logic.
+
+        path is the path to the file(which does not need to exist yet)
+        notebook must be the Notebook instance the note will be a part of
+
+        """
+        QWidget.__init__(self)
+        self.notebook = notebook
+        self.path = path
+
+        #Set up the embedded webkit
+        self.edit = QTextEdit()
+
+        #set up the toolbar
+        self.tools = QWidget()
+        self.tools.lo = QHBoxLayout()
+        self.tools.setLayout(self.tools.lo)
+
+        if self.path:
+            #Watch the file so we can auto reload
+            self.watcher = QFileSystemWatcher()
+            self.watcher.addPath(self.path)
+            self.watcher.fileChanged.connect(self.reload)
+
+
+        #Put the widgets together
+        self.lo = QVBoxLayout()
+        self.setLayout(self.lo)
+        self.tools= NoteToolBar(self)
+        self.lo.addWidget(self.tools)
+        self.lo.addWidget(self.edit)
+
+        self.reload()
+
+    def save(self):
+        #Readonly html file support
+        if self.path.endswith(".ro"):
+            return
+        #
+        # "Save the file if it needs saving"
+        # if not self.edit.page().isModified():
+        #     return
+
+        #Back Up File
+        buf =None
+        #If the file exists, copy it to file~ first. If that exists, copy it to file4857475928345
+        if os.path.exists(self.path):
+            if not os.path.exists(self.path+"~"):
+                buf=(self.path+"~")
+                shutil.copy(self.path, self.path+"~")
+            else:
+                buf = self.path+str(time.time())
+                shutil.copy(self.path,buf )
+
+        with open(self.path,"wb") as f:
+            f.write(self.edit.toPlainText().encode("utf-8"))
+
+        if buf and os.path.isfile(buf):
+            os.remove(buf)
+
+    def reload(self,dummy=True):
+        "Reload the file from disk"
+        if os.path.isfile(self.path):
+            with open(self.path,"rb") as f:
+                s = f.read().decode("utf-8")
+            self.edit.setText(s)
+
 
 class VirtualNote(QWidget):
     def __init__(self,notebook,html=None):
@@ -483,12 +562,9 @@ class VirtualNote(QWidget):
 
         self.edit.setHtml(d, QUrl(self.path))
 
-
     def onClose(self):
         "Handle closing the tab or the whole program"
-        self.watcher.removePath(self.path)
-        self.save()
-
+        pass
     def save(self):
         pass
 
@@ -530,7 +606,10 @@ class Notebook(QTabWidget):
             else:
                 #If the file exists, open it and go to the tab.
                 if os.path.isfile(path):
-                    edit = Note(path,self)
+                    if not striptrailingnumbers(path).endswith(".txt"):
+                        edit = Note(path,self)
+                    else:
+                        edit = TxtNote(path,self)
                     self.addTab(edit,os.path.basename(path))
                     self.setCurrentIndex(self.count()-1)
                     openfiletabs[path] = edit
@@ -722,6 +801,8 @@ class App(QMainWindow):
         self.fileMenu = self.menubar.addMenu('&File')
         self.tools = self.menubar.addMenu('&Tools')
         self.help = self.menubar.addMenu('&Help')
+
+
         showabout = QAction('About', self)
         def f(*a):
             self.tabs.open("mdnotes://about.html")
@@ -736,7 +817,20 @@ class App(QMainWindow):
             self.tools.addAction(a)
         self.help.addAction(showabout)
 
-
+        showtodos = QAction('Todo List', self)
+        def f(*a):
+            html = "<h1>Todos in this notebook</h2><p>Add todo entries by putting todo:, Todo, or TODO: anywhere in the notebook folder.<dl>"
+            for f,c in (findTodos(notespath)):
+                print(f,c)
+                html=html+'<dt>In <a href="'+f+'">'+f+'</a>:</dt><dd><ul>'
+                for i in c:
+                    html+=("<li>"+i+"</li>")
+                html+=("</li></dd>")
+            html+= '</dl>'
+            print(html)
+            self.tabs.openVirtual(html=html,title="Search Results")
+        showtodos.triggered.connect(f)
+        self.tools.addAction(showtodos)
 
         self.split = QSplitter()
         self.setCentralWidget(self.split)
