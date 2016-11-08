@@ -22,7 +22,7 @@
 
 #Many thanks to the ZetCode PyQt5 tutorial
 
-import cgi,datetime,time,logging,io,sys
+import cgi,datetime,time,logging,io,sys,re
 import urllib.parse
 import urllib.request
 from configparser import ConfigParser
@@ -44,6 +44,30 @@ openfiletabs = {}
 supportedTypes = ["*.md", "*.rst", "*.html", "*.html", "*.html.ro"]
 builtinsdir = os.path.dirname(__file__)
 
+defaultstyle="""
+img
+{
+max-width:96%;
+max-height:45em;
+}
+h1
+{
+text-align:center;
+}
+h2
+{
+text-align:center;
+}
+h3
+{
+text-align:center;
+}
+h4
+{
+text-align:center;
+}
+"""
+
 def getNotebookLocation():
         "Get the notebook file either from a config file or from the command line arg"
         if not len(sys.argv)>1:
@@ -63,8 +87,8 @@ def initCSS(notespath,config):
     "Setup the CSS reloader watcher ad load the CSS. Requires the notes path and the config object. and returns the css text"
     global csswatcher
     css =interpretcnfpath(config.get("theme","css"))
-
-
+    style=defaultstyle
+    csspath = None
     #Read the user's donfigured CSS if it exists
     if os.path.exists(css):
         with open(css) as f:
@@ -84,11 +108,11 @@ def initCSS(notespath,config):
         if os.path.exists(csspath):
             with open(csspath) as f:
                 style=f.read()
-
-    #Watch the file so we can auto reload
-    csswatcher = QFileSystemWatcher()
-    csswatcher.addPath(csspath)
-    csswatcher.fileChanged.connect(rlcss)
+    if csspath:
+        #Watch the file so we can auto reload
+        csswatcher = QFileSystemWatcher()
+        csswatcher.addPath(csspath)
+        csswatcher.fileChanged.connect(rlcss)
     return style
 
 def initConfig(notespath):
@@ -161,6 +185,24 @@ def striptrailingnumbers(t):
     return t
 
 
+
+
+def searchDir(dir,pattern):
+    r=[]
+    try:
+        for d, dirs,files in os.walk(dir):
+            for i in files:
+                if not i.endswith(".md"):
+                    continue
+                fn = os.path.join(d,i)
+                with open(fn) as f:
+                    text = f.read()
+                x = re.search(pattern, text, flags=re.MULTILINE)
+                if x:
+                    r.append((fn,x.group(0)))
+        return r
+    except:
+        logging.exception("Search Failed")
 
 class NoteToolBar(QWidget):
     "Represents the toolbar for a note."
@@ -237,7 +279,7 @@ class NoteToolBar(QWidget):
 
 
 class Note(QWidget):
-    def __init__(self,path,notebook):
+    def __init__(self,path,notebook,html=None):
         """
         Class representing the actual tab pane for a note file, including the editor,
         the toolbar and the save/load logic.
@@ -256,11 +298,16 @@ class Note(QWidget):
         self.edit.settings().setAttribute(QWebSettings.JavascriptEnabled,True)
 
         def openLink(url):
-            if not url.toString().startswith("mdnotes://"):
-                self.notebook.open(os.path.join(os.path.dirname(self.path),url.toString() ))
-            else:
-                #Open knows how to handle these directly
-                self.notebook.open(url.toString())
+            try:
+                if url.toString().startswith("file://"):
+                    self.notebook.open(url.toString()[len("file://"):])
+                elif not url.toString().startswith("mdnotes://"):
+                    self.notebook.open(os.path.join(os.path.dirname(self.path),url.toString() ))
+                else:
+                    #Open knows how to handle these directly
+                    self.notebook.open(url.toString())
+            except:
+                logging.exception("Failed to open link "+ str(url))
 
         self.edit.page().setLinkDelegationPolicy(QWebPage.DelegateAllLinks)
         self.edit.page().linkClicked.connect(openLink)
@@ -270,10 +317,11 @@ class Note(QWidget):
         self.tools.lo = QHBoxLayout()
         self.tools.setLayout(self.tools.lo)
 
-        #Watch the file so we can auto reload
-        self.watcher = QFileSystemWatcher()
-        self.watcher.addPath(self.path)
-        self.watcher.fileChanged.connect(self.reload)
+        if self.path:
+            #Watch the file so we can auto reload
+            self.watcher = QFileSystemWatcher()
+            self.watcher.addPath(self.path)
+            self.watcher.fileChanged.connect(self.reload)
 
         #from http://ralsina.me/weblog/posts/BB948.html
         #Add a search feature
@@ -287,38 +335,40 @@ class Note(QWidget):
         self.tools= NoteToolBar(self)
         self.lo.addWidget(self.tools)
         self.lo.addWidget(self.edit)
-        if os.path.isfile(self.path):
-            with open(self.path,"rb") as f:
-                s = f.read()
 
-        #now we are going to use pandoc to convert to html
-        doc = pandoc.Document()
+        if not html:
+            if os.path.isfile(self.path):
+                with open(self.path,"rb") as f:
+                    s = f.read()
+            #now we are going to use pandoc to convert to html
+            doc = pandoc.Document()
 
-        #Figure out the input format. We back things up and archive them by appenting a Timestamp
-        #to the end or else a ~. That function strips both of those things.
-        if striptrailingnumbers(self.path).endswith(".html"):
-            doc.html = s
-            self.edit.page().setContentEditable(False)
+            #Figure out the input format. We back things up and archive them by appenting a Timestamp
+            #to the end or else a ~. That function strips both of those things.
+            if striptrailingnumbers(self.path).endswith(".html"):
+                doc.html = s
+                self.edit.page().setContentEditable(False)
 
-        #The special html.ro lets us have read only HTML used for handy calculators and stuff.
-        elif striptrailingnumbers(self.path).endswith(".html.ro"):
-            doc.html = s
-            self.edit.page().setContentEditable(False)
+            #The special html.ro lets us have read only HTML used for handy calculators and stuff.
+            elif striptrailingnumbers(self.path).endswith(".html.ro"):
+                doc.html = s
+                self.edit.page().setContentEditable(False)
 
-        elif striptrailingnumbers(self.path).endswith(".md"):
-            doc.markdown = s
+            elif striptrailingnumbers(self.path).endswith(".md"):
+                doc.markdown = s
 
-        elif striptrailingnumbers(self.path).endswith(".rst"):
-            doc.rst = s
-        else:
-            raise RuntimeError("Bad filetype")
+            elif striptrailingnumbers(self.path).endswith(".rst"):
+                doc.rst = s
+            else:
+                raise RuntimeError("Bad filetype")
+            html = doc.html.decode("utf-8")
 
         #Add the CSS file before the HTML
         d="<style>"+style+"</style>"
         self.header_size = len(d)
-        d += doc.html.decode("utf-8")
+        d += html
 
-        self.edit.setHtml(d,QUrl("file://"+self.path))
+        self.edit.setHtml(d, QUrl("file://"+self.path) if self.path else QUrl("file:///"))
 
 
     def onClose(self):
@@ -375,7 +425,75 @@ class Note(QWidget):
         d += doc.html.decode("utf-8")
         self.edit.setHtml(d,QUrl("file://"+self.path))
 
+class VirtualNote(QWidget):
+    def __init__(self,notebook,html=None):
+        """
+        Class representing the actual tab pane for a note file that is really an html string in memory, including the editor,
+        the toolbar and the save/load logic.
 
+        path is the path to the file(which does not need to exist yet)
+        notebook must be the Notebook instance the note will be a part of
+
+        """
+        QWidget.__init__(self)
+        self.notebook = notebook
+        self.path="file:///"
+        #Set up the embedded webkit
+        self.edit = QWebView()
+        self.edit.page().setContentEditable(True)
+        self.edit.settings().setAttribute(QWebSettings.JavascriptEnabled,True)
+
+        def openLink(url):
+            try:
+                if url.toString().startswith("file://"):
+                    self.notebook.open(url.toString()[len("file://"):])
+                elif not url.toString().startswith("mdnotes://"):
+                    self.notebook.open(os.path.join(os.path.dirname(self.path),url.toString() ))
+                else:
+                    #Open knows how to handle these directly
+                    self.notebook.open(url.toString())
+            except:
+                logging.exception("Failed to open link "+ str(url))
+
+        self.edit.page().setLinkDelegationPolicy(QWebPage.DelegateAllLinks)
+        self.edit.page().linkClicked.connect(openLink)
+
+        #set up the toolbar
+        self.tools = QWidget()
+        self.tools.lo = QHBoxLayout()
+        self.tools.setLayout(self.tools.lo)
+
+        #from http://ralsina.me/weblog/posts/BB948.html
+        #Add a search feature
+        self.search = QLineEdit(returnPressed = lambda: self.edit.findText(self.search.text()))
+        self.search.hide()
+        self.showSearch = QShortcut("Ctrl+F", self, activated = lambda: (self.search.show() , self.search.setFocus()))
+
+        #Put the widgets together
+        self.lo = QVBoxLayout()
+        self.setLayout(self.lo)
+        self.tools= NoteToolBar(self)
+        self.lo.addWidget(self.tools)
+        self.lo.addWidget(self.edit)
+
+        #Add the CSS file before the HTML
+        d="<style>"+style+"</style>"
+        self.header_size = len(d)
+        d += html
+
+        self.edit.setHtml(d, QUrl(self.path))
+
+
+    def onClose(self):
+        "Handle closing the tab or the whole program"
+        self.watcher.removePath(self.path)
+        self.save()
+
+    def save(self):
+        pass
+
+    def reload(self,dummy=True):
+        pass
 
 class Notebook(QTabWidget):
     """
@@ -416,8 +534,20 @@ class Notebook(QTabWidget):
                     self.addTab(edit,os.path.basename(path))
                     self.setCurrentIndex(self.count()-1)
                     openfiletabs[path] = edit
+                else:
+                    raise RuntimeError("No such file "+path)
         except:
             logging.exception("Could not open file "+path)
+
+
+    def openVirtual(self,html,title):
+        "Open a new tab and load some html"
+        try:
+            edit = VirtualNote(self,html=html)
+            self.addTab(edit,title)
+            self.setCurrentIndex(self.count()-1)
+        except:
+            logging.exception("Could not open virtual file "+title)
 
     def onExit(self):
         "Save everything on shutdown"
@@ -468,12 +598,14 @@ class Browser(QWidget):
             newmd = QAction("New Note(md)",self)
             newf= QAction("New Folder",self)
             newfile= QAction("New File",self)
+            search= QAction("Search",self)
 
             menu.addAction(newf)
             menu.addAction(newmd)
             menu.addAction(newfile)
             menu.addAction(delete)
             menu.addAction(archive)
+            menu.addAction(search)
 
             t = time.time()
             k =menu.exec_(self.mapToGlobal(point))
@@ -552,6 +684,21 @@ class Browser(QWidget):
                     if ok and not os.path.exists(newp):
                         os.mkdir(newp)
 
+            #Uer has chosen to create one folder
+            if k == search:
+                path = self.files.filePath(i) or notespath
+                if not os.path.isdir(path):
+                    path = os.path.dirname(path)
+                text, ok = QInputDialog.getText(self, 'Search', 'Pattern')
+                if ok:
+                    html = "<h1>Search Results</h2><dl>"
+                    for f,c in (searchDir(path,"^.*?"+text+".*?$")):
+                        html=html+'<dt><a href="'+f+'">'+f+'</a></dt><dd>'+c+'</dd>'
+                    html+= '</dl>'
+                    self.nb.openVirtual(html=html,title="Search Results")
+
+
+
 
         self.fv.customContextMenuRequested.connect(onCustomContextMenu);
 
@@ -560,29 +707,7 @@ class Browser(QWidget):
     def dblclk(self, ind):
         self.nb.open(self.files.filePath(ind))
 
-style="""
-img
-{
-max-width:96%;
-max-height:45em;
-}
-h1
-{
-text-align:center;
-}
-h2
-{
-text-align:center;
-}
-h3
-{
-text-align:center;
-}
-h4
-{
-text-align:center;
-}
-"""
+
 
 
 
