@@ -3,17 +3,17 @@ mdNotes: Simple Markdown Notetaking
 
 ![](./screenshot.jpg)
 
-mdNotes is a WYSYWIG markdown editor written in pyqt5 for python3. Unlike some other md editors, mdNotes does not require extra metadata in md files, and uses the filesystem hierarchy itself for storing notes, for maximum compatibility wiht other tools, especially android phones when using folder sync systems.
+mdNotes is a WYSYWIG markdown editor written in pyqt5 for python3. Unlike some other md editors, mdNotes does not require extra metadata in md files, and uses the filesystem hierarchy itself for storing notes, for maximum compatibility with other tools, especially android phones when using folder sync systems.
 
 mdNotes is not even currently alpha quality yet.
 
 mdNotes internally uses pandoc to load and save markdown and so can be modified easily to support almost any format. However, one should back up any notes before opening them with mdnotes, as it may wreck any fancy formating in the load/save process.
 
-Because mdNotes is designed for notetaking and not programming, it will automatically save all open notes when you close the program or close a tab.
+Because mdNotes is designed for note-taking and not programming, it will automatically save all open notes when you close the program or close a tab.
 
 mdNotes also has limited support for reStructuredText files.
 
-Although mdNotes is primarily hierarchal, links to local files are fully supported. mdNotes uses webkit for rendering, so you can freely drag and drop images into pages(images from websites will automatically be downloaded into a local folder in the same directory as the note.
+Although mdNotes is primarily hierarchal, links to local files are fully supported. mdNotes uses webkit for rendering, so you can freely drag and drop images into pages(images from websites will automatically be downloaded into a local folder in the same directory as the note.)
 
 Installation
 ------------
