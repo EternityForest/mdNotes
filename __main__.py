@@ -41,7 +41,8 @@ from html.parser import HTMLParser
 #Global instead of with the notebook so that we can later add more places a note can be open.
 openfiletabs = {}
 
-supportedTypes = ["*.md", "*.rst", "*.html", "*.html", "*.html.ro", "*.txt"]
+supportedTypes = ["*.md", "*.rst", "*.html", "*.html", "*.html.ro", "*.txt","*.css"]
+
 builtinsdir = os.path.dirname(__file__)
 
 defaultstyle="""
@@ -83,14 +84,38 @@ def getNotebookLocation():
         else:
             return sys.argv[1]
 
+def destyle_html(h):
+    h = re.sub(r"<\/?span.*?>",'',h)
+    h=h.replace("<p><br/><p>",'<br/>')
+    return h
 
+class cssreloader():
+    def __init__(self,csspath):
+
+        self.path = csspath
+        #Watch the file so we can auto reload
+        self.csswatcher = QFileSystemWatcher()
+        self.csswatcher.addPath(csspath)
+        self.csswatcher.fileChanged.connect(self.rlcss)
+        print("Watching "+self.path)
+
+    #Handle auto reloading the CSS theme
+    def rlcss(self,*args):
+        global style
+        #Read the notebook specific style.css which overrides that if it exists
+        if os.path.exists(self.path):
+            print("reloaded "+self.path)
+            with open(self.path) as f:
+                style=f.read()
 
 def initCSS(notespath,config):
     "Setup the CSS reloader watcher ad load the CSS. Requires the notes path and the config object. and returns the css text"
-    global csswatcher
+    #Kinda hacky having style as a  global
+    global csswatcher,style
     css =interpretcnfpath(config.get("theme","css"))
     style=defaultstyle
     csspath = None
+    print (css)
     #Read the user's donfigured CSS if it exists
     if os.path.exists(css):
         with open(css) as f:
@@ -103,18 +128,9 @@ def initCSS(notespath,config):
             style=f.read()
         csspath = os.path.join(notespath,"style.css")
 
-    #Handle auto reloading the CSS theme
-    def rlcss(*args):
-        global style
-        #Read the notebook specific style.css which overrides that if it exists
-        if os.path.exists(csspath):
-            with open(csspath) as f:
-                style=f.read()
     if csspath:
-        #Watch the file so we can auto reload
-        csswatcher = QFileSystemWatcher()
-        csswatcher.addPath(csspath)
-        csswatcher.fileChanged.connect(rlcss)
+        csswatcher = cssreloader(csspath)
+
     return style
 
 def initConfig(notespath):
@@ -195,23 +211,24 @@ def searchDir(dir,pattern,all=False):
         for d, dirs,files in os.walk(dir):
             try:
                 for i in files:
-                        if not i.endswith(".md"):
+                        if not(i.endswith(".md") or i.endswith(".html") or i.endswith(".html.ro") or i.endswith(".txt") or i.endswith(".rst")):
                             continue
                         fn = os.path.join(d,i)
                         with open(fn) as f:
                             text = f.read(2*10**6)
+                        x=None
                         if all:
                             x = re.findall(pattern, text, flags=re.MULTILINE)
-                            print("op",x)
+
                         else:
                             x = re.search(pattern, text, flags=re.MULTILINE)
 
                         if not all:
                             if x:
-                                yield (fn,x.groups(0))
+                                yield (fn, x.group(0) )
                         else:
                             if x:
-                                yield (fn,[i[0] for i in x] if isinstance(x[0],tuple) else x)
+                                yield (fn, [i[0] for i in x] )
 
             except:
                 logging.exception("Searching "+i+" Failed")
@@ -220,12 +237,12 @@ def searchDir(dir,pattern,all=False):
 
 def findTodos(dir):
     #r = searchDir(dir,"[ ( ?)]",all=True)
-    r = searchDir(dir,"^(.*((TODO)|(Todo)|(todo)):.*)$",all=True)
+    r = searchDir(dir,"^(.*((TODO)|(Todo)|(todo)|(done)|(Done)|(DONE)):.*)$",all=True)
     return r
 
 class NoteToolBar(QWidget):
     "Represents the toolbar for a note."
-    def __init__(self,note,richtext=True):
+    def __init__(self,note,savable=True, reloadable=False, richtext=True):
         QWidget.__init__(self)
         self.edit = note.edit
         self.note = note
@@ -242,11 +259,19 @@ class NoteToolBar(QWidget):
         self.lop.addWidget(self.w)
         self.lop.addWidget(self.w2)
 
-        def save(d):
-            self.note.save()
-        self.save = QPushButton("Save")
-        self.save.clicked.connect(save)
-        self.lo.addWidget(self.save)
+        if savable:
+            def save(d):
+                self.note.save()
+            self.save = QPushButton("Save")
+            self.save.clicked.connect(save)
+            self.lo.addWidget(self.save)
+
+        if reloadable:
+            def reload(d):
+                self.note.reload()
+            self.reload = QPushButton("Refresh")
+            self.reload.clicked.connect(reload)
+            self.lo.addWidget(self.reload)
 
         if richtext:
             def bold(d):
@@ -262,6 +287,11 @@ class NoteToolBar(QWidget):
             self.lo.addWidget(self.ital)
 
 
+            def strike(d):
+                self.edit.page().mainFrame().evaluateJavaScript("document.execCommand('strikethrough');")
+            self.strike = QPushButton("Strike")
+            self.strike.clicked.connect(strike)
+            self.lo.addWidget(self.strike)
 
             def h1(d):
                 if(len(self.edit.selectedText())< 80):
@@ -308,6 +338,20 @@ class NoteToolBar(QWidget):
             self.normal = QPushButton("Normal")
             self.normal.clicked.connect(normal)
             self.lo2.addWidget(self.normal)
+
+            def ol(d):
+                self.edit.page().mainFrame().evaluateJavaScript('document.execCommand("insertOrderedList");')
+            self.ol = QPushButton("ol")
+            self.ol.setToolTip("Create Ordered List")
+            self.ol.clicked.connect(ol)
+            self.lo2.addWidget(self.ol)
+
+            def ul(d):
+                self.edit.page().mainFrame().evaluateJavaScript('document.execCommand("insertUnorderedList");')
+            self.ul = QPushButton("ul")
+            self.ul.setToolTip("Create Unordered List")
+            self.ul.clicked.connect(ul)
+            self.lo2.addWidget(self.ul)
 
             def Timestamp(d):
                 t =datetime.datetime.now().strftime(config.get("basic", "strftime",raw=True))
@@ -430,8 +474,8 @@ class Note(QWidget):
 
         #Again, pandoc to convert to the proper format
         doc = pandoc.Document()
-        h = downloadAllImages(self.edit.page().mainFrame().toHtml(),self.path).encode("utf-8")
-        doc.html = h
+        h = downloadAllImages(self.edit.page().mainFrame().toHtml(),self.path)
+        doc.html = destyle_html(h).encode("utf-8")
 
         if  striptrailingnumbers(self.path).endswith("md"):
             with open(self.path,"wb") as f:
@@ -464,7 +508,7 @@ class Note(QWidget):
                 self.edit.page().setContentEditable(False)
 
             elif striptrailingnumbers(self.path).endswith(".md"):
-                doc.markdown = s
+                doc.markdown_github = s
 
             elif striptrailingnumbers(self.path).endswith(".rst"):
                 doc.rst = s
@@ -548,11 +592,11 @@ class TxtNote(Note):
         if os.path.isfile(self.path):
             with open(self.path,"rb") as f:
                 s = f.read().decode("utf-8")
-            self.edit.setText(s)
+            self.edit.setPlainText(s)
 
 
-class VirtualNote(QWidget):
-    def __init__(self,notebook,html=None):
+class VirtualNote(Note):
+    def __init__(self,notebook,html=None,onclose=None, reloader = None,editable=False):
         """
         Class representing the actual tab pane for a note file that is really an html string in memory, including the editor,
         the toolbar and the save/load logic.
@@ -566,8 +610,11 @@ class VirtualNote(QWidget):
         self.path="file:///"
         #Set up the embedded webkit
         self.edit = QWebView()
-        self.edit.page().setContentEditable(True)
+        if editable:
+            self.edit.page().setContentEditable(True)
         self.edit.settings().setAttribute(QWebSettings.JavascriptEnabled,True)
+        self.closeCallback=onclose
+        self.reloader=reloader
 
         def openLink(url):
             try:
@@ -609,14 +656,19 @@ class VirtualNote(QWidget):
 
         self.edit.setHtml(d, QUrl(self.path))
 
+    def setHtml(self,html):
+        self.edit.setHtml(html, QUrl(self.path))
+
     def onClose(self):
         "Handle closing the tab or the whole program"
-        pass
+        if self.closeCallback:
+            self.closeCallback(self)
     def save(self):
         pass
 
     def reload(self,dummy=True):
-        pass
+        if self.reloader:
+            self.reloader(self)
 
 class Notebook(QTabWidget):
     """
@@ -653,7 +705,7 @@ class Notebook(QTabWidget):
                         self.setCurrentIndex(i)
             else:
                 #If the file exists, open it and go to the tab.
-                if not (raw or striptrailingnumbers(path).endswith(".txt")):
+                if not (raw or striptrailingnumbers(path).endswith(".txt") or striptrailingnumbers(path).endswith(".css")):
                     edit = Note(path,self)
                 else:
                     edit = TxtNote(path,self)
@@ -665,12 +717,13 @@ class Notebook(QTabWidget):
             logging.exception("Could not open file "+path)
 
 
-    def openVirtual(self,html,title):
+    def openVirtual(self,html,title,onclose=None,reloader=None):
         "Open a new tab and load some html"
         try:
-            edit = VirtualNote(self,html=html)
+            edit = VirtualNote(self,html=html,onclose=onclose,reloader=reloader)
             self.addTab(edit,title)
             self.setCurrentIndex(self.count()-1)
+            return edit
         except:
             logging.exception("Could not open virtual file "+title)
 
@@ -817,12 +870,22 @@ class Browser(QWidget):
                 if not os.path.isdir(path):
                     path = os.path.dirname(path)
                 text, ok = QInputDialog.getText(self, 'Search', 'Pattern')
+                x=[0]
+
+                #Allow the user to stop the search by closing the search results tab.
+                def stop(o):
+                    x[0]=True
                 if ok:
-                    html = "<h1>Search Results</h2><dl>"
-                    for f,c in (searchDir(path,"^.*?"+text+".*?$")):
-                        html=html+'<dt><a href="'+f+'">'+f+'</a></dt><dd>'+c+'</dd>'
+                    html = "<style>"+style+'</style>'+"<h1>Search Results</h2><dl>"
+                    tab = self.nb.openVirtual(html=html,title="Search Results",onclose=stop)
+                    for f,c in (searchDir(path,"^.*?"+text.replace(".","\\")+".*?$")):
+                        app.processEvents()
+                        if x[0]:
+                            break
+                        print(f,c)
+                        html=html+'<dt><a href="'+f+'">'+f+'</a></dt><dd>'+str(c)+'</dd>'
                     html+= '</dl>'
-                    self.nb.openVirtual(html=html,title="Search Results")
+                    tab.setHtml(html)
 
             #Uer has chosen to create one folder
             if k == editr:
@@ -843,10 +906,11 @@ class Browser(QWidget):
 
 
 class App(QMainWindow):
+    "Class representinf the main app window"
     def __init__(self):
         QMainWindow.__init__(self)
         self.setWindowTitle('mdNotes')
-
+        self.setWindowIcon(QtGui.QIcon(os.path.join(os.path.dirname(__file__), "W_Book01.png" )))
         #Setup menu bar
         self.menubar = self.menuBar()
         self.fileMenu = self.menubar.addMenu('&File')
@@ -869,17 +933,32 @@ class App(QMainWindow):
         self.help.addAction(showabout)
 
         showtodos = QAction('Todo List', self)
+
+        #Use x[0] as a mutable flag to stop the search
+        x=[0]
+        def stop(o):
+            x[0]=1
         def f(*a):
-            html = "<h1>Todos in this notebook</h2><p>Add todo entries by putting todo:, Todo, or TODO: anywhere in the notebook folder.<dl>"
+            html = "<style>"+style+'</style>'+"""<h1>Todos in this notebook</h2><p>Add todo entries by putting todo: something, Todo: A thing, or TODO: this thing
+            anywhere in the notebook folder, with one todo per line.
+              Change them to done: to indicate you have done them.<dl>"""
+            tab = self.tabs.openVirtual(html=html,title="Todo List")
             for f,c in (findTodos(notespath)):
-                print(f,c)
+                #Keep the program responsive
+                app.processEvents()
+                if x[0]:
+                    break
                 html=html+'<dt>In <a href="'+f+'">'+f+'</a>:</dt><dd><ul>'
                 for i in c:
-                    html+=("<li>"+i+"</li>")
+                    todo = str(i)
+                    if "done:" in todo:
+                        html+=("<li><s>"+todo.replace("done:","")+"</s></li>")
+                    else:
+                        html+=("<li>"+todo+"</li>")
                 html+=("</li></dd>")
             html+= '</dl>'
-            print(html)
-            self.tabs.openVirtual(html=html,title="Search Results")
+            tab.setHtml(html)
+
         showtodos.triggered.connect(f)
         self.tools.addAction(showtodos)
 
@@ -906,6 +985,6 @@ if __name__ == '__main__':
     app.setStyleSheet(style)
 
     w = App()
-    w.show()
+    w.showMaximized()
 
     sys.exit(app.exec_())

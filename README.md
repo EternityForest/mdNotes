@@ -52,4 +52,40 @@ Theming and customization
 
 Because mdNotes renders with webkit, you can put a style.css folder in your notes folder that will be applied to the text. You have to restart mdNotes for a new theme to work.
 
-You can also put a global theme in  ~/.mdnotes/style.css, however themes directly in the notebook will take precedence.
+You can also put a global theme in ~/.mdnotes/style.css, however themes directly in the notebook will take precedence.
+
+Formatting Examples
+-------------------
+
+> This is a block quote, which you can create by clicking a button
+> -the author of this program
+
+This is a paragraph of normal text.
+
+*This is italic*
+
+**Bold**
+
+1.  Ordered list item 1
+2.  item 2
+
+-   Unordered lists
+-   Item 2
+-   item 3
+
+todo: This todo list item will show up in your todo list, which you can find at Tools&gt;Todo List
+
+done: This todo list item will show up in your todo list crossed out
+
+Todo list items can be anywhere in your notebook and are sorted by what file they are in.
+
+    This is a block of preformatted text
+    Note that it is in monospace and looks different.
+    Perfect for writing code samples
+
+### Headings
+
+Can also be made just by clicking the button.
+because mdNotes uses github flavored markdown, sharing your notes is easy.
+
+
