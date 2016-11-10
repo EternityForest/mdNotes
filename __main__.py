@@ -22,7 +22,7 @@
 
 #Many thanks to the ZetCode PyQt5 tutorial
 
-import cgi,datetime,time,logging,io,sys,re
+import cgi,datetime,time,logging,io,sys,re,webbrowser,subprocess
 import urllib.parse
 import urllib.request
 from configparser import ConfigParser
@@ -36,6 +36,9 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
 
 from html.parser import HTMLParser
+
+#The absolute path to the current notebook folder, or None if there is none.
+notespath = None
 
 # global lists of diles that are open in any tab so we don't open them twice.
 #Global instead of with the notebook so that we can later add more places a note can be open.
@@ -69,20 +72,71 @@ text-align:center;
 }
 """
 
+#These functions work based on looking in a file called .mdnotes/notebooks.txt, which is just a list of filenames, one per line.
+#The first is the default notebooks directory.
+
 def getNotebookLocation():
         "Get the notebook file either from a config file or from the command line arg"
+        p=None
+        if os.path.exists(os.path.expanduser("~/.mdnotes/notebooks.txt")):
+            p = os.path.expanduser("~/.mdnotes/notebooks.txt")
+        else:
+            if os.path.exists(os.path.expanduser("~/.mdnotes/notebooks.txt")+"~"):
+                p= os.path.expanduser("~/.mdnotes/notebooks.txt")+"~"
+
+
         if not len(sys.argv)>1:
+            #If no config file and also no shell arg
+            if not p:
+                print("No notebooks.txt found")
+                return os.getcwd()
+
+            #Read the config
+            with open(p) as f:
+                t = f.read()
+
+            #Get the lines, but handle bizzare newline formats
+            t= t.replace("\r","").split("\n")
+
+            #Expand the user in the first line to get the absolute pathto the default notebook
+            np= os.path.join(os.path.expanduser(t[0]))
+
+            if np.endswith("/"):
+                return np[:-1]
+            else:
+                return np
+        else:
+            return sys.argv[1] if os.path.exists(sys.argv[1]) else os.getcwd()
+
+
+def setNotebookLocation(l):
+        "Set the default notebook file"
+
+        #Ensure that there is actually a folder in which to store the default notebooks
+        if not os.path.exists(os.path.expanduser("~/.mdnotes/")):
+            os.mkdir(os.path.expanduser("~/.mdnotes/"))
+
+        if os.path.isfile(os.path.expanduser("~/.mdnotes/notebooks.txt")):
             with open(os.path.expanduser("~/.mdnotes/notebooks.txt")) as f:
                 t = f.read()
 
+            #Make it into a list, handle odd newlines
             t= t.replace("\r","").split("\n")
 
-            return os.path.join(os.path.expanduser(t[0]))
-
-            if notespath.endswith("/"):
-                return notespath[:-1]
+            #If there's already an entry, get rid of it
+            if l in t:
+                t.remove(l)
         else:
-            return sys.argv[1]
+            t= []
+
+        #Put it right at the top so it's the default notebook
+        t = [l]+t
+
+        #Write it to a file
+        with open(os.path.expanduser("~/.mdnotes/notebooks.txt"),"w") as f:
+            f.write("\n".join(t))
+
+
 
 def destyle_html(h):
     h = re.sub(r"<\/?span.*?>",'',h)
@@ -122,11 +176,12 @@ def initCSS(notespath,config):
             style=f.read()
         csspath = css
 
-    #Read the notebook specific style.css which overrides that if it exists
-    if os.path.exists(os.path.join(notespath,"style.css")):
-        with open(os.path.join(notespath,"style.css")) as f:
-            style=f.read()
-        csspath = os.path.join(notespath,"style.css")
+    if notespath:
+        #Read the notebook specific style.css which overrides that if it exists
+        if os.path.exists(os.path.join(notespath,"style.css")):
+            with open(os.path.join(notespath,"style.css")) as f:
+                style=f.read()
+            csspath = os.path.join(notespath,"style.css")
 
     if csspath:
         csswatcher = cssreloader(csspath)
@@ -145,7 +200,9 @@ def initConfig(notespath):
 
     config = ConfigParser(allow_no_value=True)
     config.read_string(default)
-    config.read([os.path.expanduser("~/.mdnotes/mdnotes.conf"),os.path.join(notespath, 'notebook.conf')])
+    config.read([os.path.expanduser("~/.mdnotes/mdnotes.conf")])
+    if notespath:
+        config.read([os.path.join(notespath, 'notebook.conf')])
     return config
 
 def html_resolve_paths(h):
@@ -407,6 +464,9 @@ class Note(QWidget):
 
         def openLink(url):
             try:
+                if url.toString().startswith("http"):
+                    webbrowser.open_new_tab(url.toString())
+                    return
                 if url.toString().startswith("file://"):
                     self.notebook.open(url.toString()[len("file://"):])
                 elif not url.toString().startswith("mdnotes://"):
@@ -618,7 +678,11 @@ class VirtualNote(Note):
 
         def openLink(url):
             try:
-                if url.toString().startswith("file://"):
+                if url.toString().startswith("http"):
+                    webbrowser.open_new_tab(url.toString())
+                    return
+
+                elif url.toString().startswith("file://"):
                     self.notebook.open(url.toString()[len("file://"):])
                 elif not url.toString().startswith("mdnotes://"):
                     self.notebook.open(os.path.join(os.path.dirname(self.path),url.toString() ))
@@ -747,7 +811,8 @@ class Browser(QWidget):
         #SEtup file system model
         self.files = QFileSystemModel()
         self.files.setNameFilters(supportedTypes)
-        self.files.setRootPath(notespath)
+        if notespath:
+            self.files.setRootPath(notespath)
 
         #Setup the view over that
         self.fv = QTreeView()
@@ -756,7 +821,10 @@ class Browser(QWidget):
         self.fv.hideColumn(3)
         self.fv.hideColumn(1)
         self.fv.resizeColumnToContents(0)
+
+        #I don't know what that line does, but it's important!!!!
         self.fv.setRootIndex(self.files.setRootPath("/Users"))
+
         self.fv.doubleClicked.connect(self.dblclk)
         self.fv.expanded.connect(lambda x:     self.fv.resizeColumnToContents(0))
         self.fv.clicked.connect(lambda x:     self.fv.resizeColumnToContents(0))
@@ -768,6 +836,8 @@ class Browser(QWidget):
         self.fv.setContextMenuPolicy(Qt.CustomContextMenu);
 
         def onCustomContextMenu(point):
+            if not notespath:
+                return
             i=self.fv.indexAt(point)
             #Build the menu itself.
             menu = QMenu()
@@ -917,11 +987,31 @@ class App(QMainWindow):
         self.tools = self.menubar.addMenu('&Tools')
         self.help = self.menubar.addMenu('&Help')
 
+        opennotebook = QAction('Open Notebok Folder', self)
+        def opennb(*a):
+            b = QFileDialog.getExistingDirectory(self, "Open Directory",
+                                                os.path.expanduser("~"),
+                                                QFileDialog.ShowDirsOnly
+                                                | QFileDialog.DontResolveSymlinks)
+            subprocess.Popen([__file__, b], close_fds=True)
+        opennotebook.triggered.connect(opennb)
+        self.fileMenu.addAction(opennotebook)
+
+
+        setnotebook = QAction('Set as Default Notebook', self)
+
+
+        def setnb(*a):
+            if notespath:
+                setNotebookLocation(notespath)
+        setnotebook.triggered.connect(setnb)
+        self.fileMenu.addAction(setnotebook)
 
         showabout = QAction('About', self)
         def f(*a):
             self.tabs.open("mdnotes://about.html")
         showabout.triggered.connect(f)
+        self.help.addAction(showabout)
 
         #Make a folder for each of our builtins in the builtins folder. Right now it's just an example though
         for i in [i for i in os.listdir(os.path.join(os.path.dirname(__file__),'builtins')) if os.path.isfile(os.path.join(os.path.dirname(__file__),'builtins',i))]:
@@ -930,7 +1020,12 @@ class App(QMainWindow):
                 self.tabs.open(os.path.join(os.path.dirname(__file__),'builtins',i))
             a.triggered.connect(f)
             self.tools.addAction(a)
-        self.help.addAction(showabout)
+
+        #
+        # editcss = QAction('Edit User CSS Theme', self)
+        # def f(*a):
+        #     self.tabs.open(os.expanduser("~/.mdnotes/style.css"))
+        # editcss.triggered.connect(f)
 
         showtodos = QAction('Todo List', self)
 
@@ -938,7 +1033,10 @@ class App(QMainWindow):
         x=[0]
         def stop(o):
             x[0]=1
+
         def f(*a):
+            if not notespath:
+                return
             html = "<style>"+style+'</style>'+"""<h1>Todos in this notebook</h2><p>Add todo entries by putting todo: something, Todo: A thing, or TODO: this thing
             anywhere in the notebook folder, with one todo per line.
               Change them to done: to indicate you have done them.<dl>"""

@@ -29,12 +29,14 @@ On Ubuntu:
 
 then simply run `__main__.py`
 
-mdNotes expects either for it's first command line argument to be a path to the notebook folder you want to edit, or for there to be a file at ~/.mdnotes/notebooks.txt that contains the path of the folder you want to be your notes folder.
+You can then use File&gt;Open Notebook Folder to open the folder you want to keep your notes in(It defaults to the working directory), and use File&gt;Set as Default Notebook to make this the notebook used every time the application starts.
 
 Config Files
 ------------
 
 mdNotes will look for "~/.mdnotes/mdnotes.conf" and then for notebookfolder/notebook.conf (values in the second one take precedence over the first one)
+
+The "~/.mdnotes" folder is also where the default notebook is kept, in a text file called notebooks.txt which is just the URL of a notebook.
 
 The format is a normal INI style file, with the following format:
 
@@ -87,5 +89,3 @@ Todo list items can be anywhere in your notebook and are sorted by what file the
 
 Can also be made just by clicking the button.
 because mdNotes uses github flavored markdown, sharing your notes is easy.
-
-

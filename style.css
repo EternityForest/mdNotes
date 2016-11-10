@@ -26,50 +26,54 @@ QTreeView {
 
 img
 {
-max-width:96%;
-max-height:45em;
+    max-width:96%;
+    max-height:45em;
 }
 
 h1
 {
-text-align:center;
-font-family: Times, serif;
-
+    text-align:center;
+    font-family: Times, serif;
 }
 
 
 h2
 {
-text-align:center;
-color:rgb(60,60,60);
-font-family: Times, serif;
+    text-align:center;
+    color:rgb(60,60,60);
+    font-family: Times, serif;
 }
 
 
 h3
 {
-text-align:center;
-color:rgb(80,80,80);
-font-family: Times, serif;
-
-
+    text-align:center;
+    color:rgb(80,80,80);
+    font-family: Times, serif;
 }
+
 h4
 {
-text-align:center;
-color:rgb(90,90,90);
-font-family: Times, serif;
-
+    text-align:center;
+    color:rgb(90,90,90);
+    font-family: Times, serif;
 }
 
 body
 {
-background-color: : rgb(250,250,245);
-color: rgb(55,55,55);
-font-family: """Linux Libertine", Times, serif;
-padding-bottom: 12em;
+    background-color: : rgb(250,250,245);
+    color: rgb(55,55,55);
+    font-family: """Linux Libertine", Times, serif;
+    margin-bottom: 12em;
 }
-
+body:last-child
+{
+    margin-bottom: 12em;
+}
+a
+{
+    title: attr("href");
+}
 img {
     display: table;
     margin: 0 auto;
@@ -77,9 +81,9 @@ img {
 
 
 div{
-    display:table;
-
+    display:table
 }
+
 blockquote
 {
     margin: 0 auto;
