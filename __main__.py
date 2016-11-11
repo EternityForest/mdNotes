@@ -34,6 +34,7 @@ from PyQt5.QtCore import QUrl, QFileSystemWatcher
 import sys,os,atexit,time,pandoc,shutil
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
+from PyQt5 import QtCore
 
 from html.parser import HTMLParser
 
@@ -169,7 +170,6 @@ def initCSS(notespath,config):
     css =interpretcnfpath(config.get("theme","css"))
     style=defaultstyle
     csspath = None
-    print (css)
     #Read the user's donfigured CSS if it exists
     if os.path.exists(css):
         with open(css) as f:
@@ -196,7 +196,12 @@ def initConfig(notespath):
     strftime = %b %d %I:%M%p %G
     [theme]
     css = ~/.mdnotes/style.css
+
     """
+    # Maybe add this?
+    # [todolist]
+    # regex = ^(.*((TODO)|(Todo)|(todo)|(done)|(Done)|(DONE)):.*)$
+    # ^.*((done)|(Done)|(DONE)):
 
     config = ConfigParser(allow_no_value=True)
     config.read_string(default)
@@ -442,6 +447,50 @@ class NoteToolBar(QWidget):
             self.lo.addWidget(self.ts)
 
 
+def fn_to_title(s):
+    #Heuristic to detect intentional hyphen use rather than use to replace spaces.
+    #If it contains a space, we assume any hyphens need to be there.
+    if not " " in s:
+        s=s.replace("-"," ")
+    return s.replace("_"," ")
+
+#todo: this should be i8n compatible
+#source: http://www.rasmusen.org/w/capitalization.htm
+nocap = ["the","for","of","and",'in','a','but',
+        'yet','so','from','to','of','with','without',
+        'around','an','along','by','after','among','between', 'since','before','ago','past','till','until',
+        'beside','over','under','above','across','against','throughout','underneath','within','except','beyond','despite','during',
+        'behind','along','beneath']
+
+def capitalize(s):
+    #Capitalize all words not in the list or that are the fist
+    l = s.split(" ")
+    return ' '.join([i.title() if ((not i in nocap) or (v==0) or (v== (len(l)-1) )) else i for v,i in enumerate(l)])
+
+class WebkitNoteEditor(QWebView):
+    "The actual box used for displaying and editing notes"""
+    def dropEvent(self,e):
+        "Modify incoming drag and dropped urls to use a relative path."
+        try:
+            #The startswith thing witll only filter out some of the annoying exception logs but it's better than nothing
+            #todo: only modify things that actuall
+            if e.mimeData().hasUrls() and e.mimeData().urls()[0].toString().startswith("file://"):
+                droppedpath = e.mimeData().urls()[0].toString()[len("file://"):]
+                here = self.url().toString()[len("file://"):]
+                print(here, droppedpath)
+                #Don't modify absolute paths to anything outside the notes directory.
+                if not os.path.relpath(droppedpath, notespath).startswith(".."):
+                #e.mimeData().setUrls([QtCore.QUrl(os.path.relpath(self.url().toString(), e.mimeData().urls()[0].toString()))])
+
+                    #Create a link as Html that looks the way we want it to.
+                    e.mimeData().setHtml('<a href="'+
+                    urllib.parse.quote_plus(os.path.relpath(droppedpath, os.path.dirname(here)  )    )+
+                    '">'+capitalize(fn_to_title(
+                    '.'.join(
+                            os.path.basename(droppedpath).split(".")[:-1]))) +"</a>")
+        except:
+            logging.exception("Failed to modify to relative path")
+        QWebView.dropEvent(self,e)
 
 class Note(QWidget):
     def __init__(self,path,notebook):
@@ -458,24 +507,26 @@ class Note(QWidget):
         self.path = path
 
         #Set up the embedded webkit
-        self.edit = QWebView()
+        self.edit = WebkitNoteEditor()
         self.edit.page().setContentEditable(True)
         self.edit.settings().setAttribute(QWebSettings.JavascriptEnabled,True)
 
         def openLink(url):
+            decoded_url = urllib.parse.unquote_plus(url.toString())
             try:
-                if url.toString().startswith("http"):
+                if decoded_url.startswith("http"):
+                    #Note that we just pass the unmodifed url and assume the browser will handle that better
                     webbrowser.open_new_tab(url.toString())
                     return
-                if url.toString().startswith("file://"):
-                    self.notebook.open(url.toString()[len("file://"):])
-                elif not url.toString().startswith("mdnotes://"):
-                    self.notebook.open(os.path.join(os.path.dirname(self.path),url.toString() ))
+                if decoded_url.startswith("file://"):
+                    self.notebook.open(decoded_url[len("file://"):])
+                elif not decoded_url.startswith("mdnotes://"):
+                    self.notebook.open(os.path.join(os.path.dirname(self.path),decoded_url ))
                 else:
                     #Open knows how to handle these directly
-                    self.notebook.open(url.toString())
+                    self.notebook.open(decoded_url)
             except:
-                logging.exception("Failed to open link "+ str(url))
+                logging.exception("Failed to open link "+ str(url.toString()))
 
         self.edit.page().setLinkDelegationPolicy(QWebPage.DelegateAllLinks)
         self.edit.page().linkClicked.connect(openLink)
@@ -807,7 +858,6 @@ class Browser(QWidget):
         QWidget.__init__(self)
         self.lo = QVBoxLayout()
         self.setLayout(self.lo)
-
         #SEtup file system model
         self.files = QFileSystemModel()
         self.files.setNameFilters(supportedTypes)
@@ -828,7 +878,7 @@ class Browser(QWidget):
         self.fv.doubleClicked.connect(self.dblclk)
         self.fv.expanded.connect(lambda x:     self.fv.resizeColumnToContents(0))
         self.fv.clicked.connect(lambda x:     self.fv.resizeColumnToContents(0))
-
+        self.fv.setDragEnabled(True)
         self.lo.addWidget(self.fv)
 
 
@@ -952,7 +1002,6 @@ class Browser(QWidget):
                         app.processEvents()
                         if x[0]:
                             break
-                        print(f,c)
                         html=html+'<dt><a href="'+f+'">'+f+'</a></dt><dd>'+str(c)+'</dd>'
                     html+= '</dl>'
                     tab.setHtml(html)
@@ -1049,7 +1098,7 @@ class App(QMainWindow):
                 html=html+'<dt>In <a href="'+f+'">'+f+'</a>:</dt><dd><ul>'
                 for i in c:
                     todo = str(i)
-                    if "done:" in todo:
+                    if re.match("^.*((done)|(Done)|(DONE)):",todo):
                         html+=("<li><s>"+todo.replace("done:","")+"</s></li>")
                     else:
                         html+=("<li>"+todo+"</li>")
