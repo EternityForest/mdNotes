@@ -19,7 +19,7 @@ Although mdNotes is primarily hierarchal, links to local files are fully support
 
 You can also drag and drop links directly from the file browser sidebar into a note. 
 
-Links dropped in this manner will automatically be converted into relative paths relative to the document you are dropping them into(So they will keep working if you move or copy the whole notebook folder) and will be converted into the proper title for the note using a heuristic("note tite" becomes Note Title, "the title of the note" becomes "The Title of the Note")
+Links dropped in this manner will automatically be converted into relative paths relative to the document you are dropping them into(So they will keep working if you move or copy the whole notebook folder) and will be converted into the proper title for the note using a heuristic("note title" becomes Note Title, "the title of the note" becomes "The Title of the Note")
 
 Links dropped in from outside the notebook will not be modified.
 
