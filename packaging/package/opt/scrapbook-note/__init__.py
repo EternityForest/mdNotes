@@ -1,1 +1,0 @@
-../../../../pyscrapbook/__init__.py
