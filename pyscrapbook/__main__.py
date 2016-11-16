@@ -36,7 +36,7 @@ from PyQt5.QtCore import Qt
 from PyQt5 import QtCore
 
 
-import config,styles,notes
+import config,styles,notes,plugins
 
 
 __version__ ="0.1.0"
@@ -48,9 +48,17 @@ openfiletabs = {}
 
 supportedTypes = ["*.md", "*.rst", "*.html", "*.html", "*.html.ro", "*.txt","*.css","*.jpg","*.png","*.svg"]
 
-builtinsdir = os.path.dirname(__file__)
+builtinsdir = os.path.dirname(os.path.realpath(__file__))
 
 
+class Tool():
+    def __init__(self,title, function):
+        self.title = title
+        self.function = function
+
+plugins.addPluginType("tool",Tool)
+
+import calendarnote
 
 def searchDir(dir,pattern,all=False):
         for d, dirs,files in os.walk(dir):
@@ -87,28 +95,6 @@ def findTodos(dir):
     return r
 
 
-def fn_to_title(s):
-    #Heuristic to detect intentional hyphen use rather than use to replace spaces.
-    #If it contains a space, we assume any hyphens need to be there.
-    if not " " in s:
-        s=s.replace("-"," ")
-    return s.replace("_"," ")
-
-#todo: this should be i8n compatible
-#source: http://www.rasmusen.org/w/capitalization.htm
-nocap = ["the","for","of","and",'in','a','but',
-        'yet','so','from','to','of','with','without',
-        'around','an','along','by','after','among','between', 'since','before','ago','past','till','until',
-        'beside','over','under','above','across','against','throughout','underneath','within','except','beyond','despite','during',
-        'behind','along','beneath']
-
-def capitalize(s):
-    #Capitalize all words not in the list or that are the fist
-    l = s.split(" ")
-    return ' '.join([i.title() if ((not i in nocap) or (v==0) or (v== (len(l)-1) )) else i for v,i in enumerate(l)])
-
-
-
 class Notebook(QTabWidget):
     """
     Class representing the tabbed area in which notes are viewed.
@@ -129,7 +115,34 @@ class Notebook(QTabWidget):
 
     def open(self,path,raw=False,create=False):
         "Open a new tab given a path to a supported file"
-        print(path)
+        # if search:
+        #     scrolljs ="""
+        #         var walkDOM = function (node,func) {
+        #                 func(node);                     //What does this do?
+        #                 node = node.firstChild;
+        #                 while(node) {
+        #                     walkDOM(node,func);
+        #                     node = node.nextSibling;
+        #                 }
+        #
+        #             };
+        #
+        #          lookFor = function(str)
+        #          {
+        #
+        #             var c = function(node)
+        #                 {
+        #                  if (node.innerText.indexOf(str) != -1)
+        #                  {
+        #                     window.scrollTo(0,node.offsetTop);
+        #                  }
+        #                 }
+        #          }
+        #
+        #          walkDOM(document.body, lookFor("THING_TO_SEARCH_FOR"))
+        #
+        #     """.replace("THING_TO_SEARCH_FOR", search)
+
         if not path.startswith("mdnotes://"):
             pass
         else:
@@ -148,10 +161,16 @@ class Notebook(QTabWidget):
                 self.addTab(edit,os.path.basename(path))
                 self.setCurrentIndex(self.count()-1)
                 openfiletabs[path] = edit
+                # if search:
+                #     edit.edit.page().mainFrame().evaluateJavaScript(scrolljs)
 
         except:
             logging.exception("Could not open file "+path)
 
+
+    def add(self,tab,path):
+        self.addTab(tab,path)
+        self.setCurrentIndex(self.count()-1)
 
     def openVirtual(self,html,title,onclose=None,reloader=None,reloadbutton=False):
         "Open a new tab and load some html"
@@ -174,7 +193,6 @@ class CustomTreeView(QTreeView):
     "A modified tree view that can move md files and fix the llinks so they still work"
     def dropEvent(self,e):
         #Get the place it's being dropped at
-        print(e)
         try:
             i=self.indexAt(e.pos())
             target= self.model().filePath(i)
@@ -185,7 +203,6 @@ class CustomTreeView(QTreeView):
 
             if e.mimeData().hasUrls():
                 n = e.mimeData().urls()[0].toString()
-                print(n,target)
                 if n.startswith("file://"):
                     n=n[len("file://"):]
                     if os.path.isfile(n):
@@ -411,8 +428,8 @@ class App(QMainWindow):
     "Class representinf the main app window"
     def __init__(self):
         QMainWindow.__init__(self)
-        self.setWindowTitle('mdNotes')
-        self.setWindowIcon(QtGui.QIcon(os.path.join(os.path.dirname(__file__), "W_Book01.png" )))
+        self.setWindowTitle('Scrapbook ('+config.notespath+')')
+        self.setWindowIcon(QtGui.QIcon(os.path.join(os.path.dirname(os.path.realpath(__file__)), "W_Book01.png" )))
         #Setup menu bar
         self.menubar = self.menuBar()
         self.fileMenu = self.menubar.addMenu('&File')
@@ -425,7 +442,7 @@ class App(QMainWindow):
                                                 os.path.expanduser("~"),
                                                 QFileDialog.ShowDirsOnly
                                                 | QFileDialog.DontResolveSymlinks)
-            subprocess.Popen([__file__, b], close_fds=True)
+            subprocess.Popen([os.path.realpath(__file__), b], close_fds=True)
         opennotebook.triggered.connect(opennb)
         self.fileMenu.addAction(opennotebook)
 
@@ -446,13 +463,19 @@ class App(QMainWindow):
         self.help.addAction(showabout)
 
         #Make a folder for each of our builtins in the builtins folder. Right now it's just an example though
-        for i in [i for i in os.listdir(os.path.join(os.path.dirname(__file__),'builtins')) if os.path.isfile(os.path.join(os.path.dirname(__file__),'builtins',i))]:
+        for i in [i for i in os.listdir(os.path.join(os.path.dirname(os.path.realpath(__file__)),'builtins')) if os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)),'builtins',i))]:
             a = QAction(i[:-8], self)
             def f(*a):
-                self.tabs.open(os.path.join(os.path.dirname(__file__),'builtins',i))
+                self.tabs.open(os.path.join(os.path.dirname(os.path.realpath(__file__)),'builtins',i))
             a.triggered.connect(f)
             self.tools.addAction(a)
 
+        for i in plugins.getPlugins("tool"):
+            a = QAction(i.title, self)
+            def f(*a):
+                i.function(self.tabs)
+            a.triggered.connect(f)
+            self.tools.addAction(a)
         #
         # editcss = QAction('Edit User CSS Theme', self)
         # def f(*a):

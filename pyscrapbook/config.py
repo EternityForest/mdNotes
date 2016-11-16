@@ -45,7 +45,7 @@ def loadConfigFiles():
 
 def interpretPath(p):
     "Expand user and correectly resolve a path found in a config file"
-    return os.path.join(os.path.dirname(__file__),os.path.expanduser(p))
+    return os.path.join(os.path.dirname(os.path.realpath(__file__)),os.path.expanduser(p))
 
 #These functions work based on looking in a file called .mdnotes/notebooks.txt, which is just a list of filenames, one per line.
 #The first is the default notebooks directory.

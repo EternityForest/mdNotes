@@ -1,0 +1,1 @@
+../../../../pyscrapbook/__main__.py

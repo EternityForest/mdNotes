@@ -81,6 +81,7 @@ def downloadAllImages(h,path):
             fp = os.path.join(path+"_img", "img_"+str(count)+"."+('png' if '.png' in i else 'jpg' if '.jpg' in i else 'svg' if '.svg' in i else 'image')  )
             count+=1
             urllib.request.urlretrieve(i, filename=fp)
+            #Replace the HTTP URL with a relative URL. It won't re-download next time because the URL is gone
             h = h.replace(i, os.path.relpath(fp, os.path.dirname(path)))
         except:
             logging.exception("Error getting image "+i)
@@ -88,16 +89,38 @@ def downloadAllImages(h,path):
 
 
 
-
-
-
-
 def noteFromFile(path,notebook,raw=False):
+        if os.path.isdir(path):
+            raise ValueError("Path is directory")
         if not (raw or util.striptrailingnumbers(path).endswith(".txt") or util.striptrailingnumbers(path).endswith(".css")):
             edit = Note(path,notebook)
         else:
             edit = TxtNote(path,notebook)
         return edit
+
+
+
+def fn_to_title(s):
+    #Heuristic to detect intentional hyphen use rather than use to replace spaces.
+    #If it contains a space, we assume any hyphens need to be there.
+    if not " " in s:
+        s=s.replace("-"," ")
+    return s.replace("_"," ")
+
+#todo: this should be i8n compatible
+#main source: http://www.rasmusen.org/w/capitalization.htm
+nocap = ["the","for","of","and",'in','a','but',
+        'yet','so','from','to','of','with','without',
+        'around','an','along','by','after','among','between', 'since','before','ago','past','till','until',
+        'beside','over','under','above','across','against','throughout','underneath','within','except','beyond','despite','during',
+        'behind','along','beneath']
+
+def capitalize(s):
+    #Capitalize all words not in the list or that are the fist
+    l = s.split(" ")
+    return ' '.join([i.title() if ((not i in nocap) or (v==0) or (v== (len(l)-1) )) else i for v,i in enumerate(l)])
+
+
 
 class NoteToolBar(QWidget):
     "Represents the toolbar for a note. If richtext is false, will not have any fancy formatting buttons"

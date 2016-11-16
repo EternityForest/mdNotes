@@ -1,0 +1,1 @@
+/home/danny/Projects/notesapp/pyscrapbook/scrapbook-log.py
