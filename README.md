@@ -81,6 +81,17 @@ Because mdNotes renders with webkit, you can put a style.css folder in your note
 
 You can also put a global theme in ~/.mdnotes/style.css, however themes directly in the notebook will take precedence.
 
+Calendar
+--------
+To mark a file as containing calendar entries, just put a 4 digit year in the top heading(If there are multiple, the first gets used).
+
+Then, each day can be recorded as a second level heading like "June 3".
+
+Events at specific times are third level headings, like "22:50" or "3pm" or "2:30am".
+
+Clicking tools>show calendar will show you all of the entries, past and future, organized by month. Double clicking an entry will
+take you directly to the file it came from.s
+
 Formatting Examples
 -------------------
 
