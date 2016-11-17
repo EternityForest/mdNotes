@@ -37,7 +37,7 @@ then simply run `__main__.py`
 
 You can then use File&gt;Open Notebook Folder to open the folder you want to keep your notes in(It defaults to the working directory), and use File&gt;Set as Default Notebook to make this the notebook used every time the application starts.
 
-Or, alternatively, cd into packaging and use fakeroot build.sh to build a debian package.
+Or, alternatively, cd into packaging and use "fakeroot make" to build a debian package.
 
 Command Line Usage
 ------------------

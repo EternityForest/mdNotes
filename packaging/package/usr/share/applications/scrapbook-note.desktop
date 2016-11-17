@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Exec=/opt/scrapbook-note/__main__.py
+Icon=/opt/scrapbook-note/W_Book01.png
+Terminal=false
+Comment=Markdown Notetaking Application
+Name=Scrapbook Note
+GenericName=scrapbook-0.1.0
+StartupNotify=false
+Categories=Office;Utility;

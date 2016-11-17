@@ -19,7 +19,7 @@
 from configparser import ConfigParser
 import sys,os
 notespath = None
-
+   
 def loadConfigFiles():
     "Given the notes path, attempt to loaf a config object from that notes path and the user's configured notes file"
     global config

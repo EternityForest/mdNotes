@@ -1,3 +1,4 @@
+#!/bin/sh
 pip install send2trash
-ln -s /opt/scrapbook-note/__main__.py /usr/bin/scrapbook  > /dev/null 2>&1
-ln -s /opt/scrapbook-note/scrapbook-log.py /usr/bin/scrapbook-log  > /dev/null 2>&1
+ln -s /opt/scrapbook-note/__main__.py /usr/bin/scrapbook  > /dev/null 2>&1 || echo
+ln -s /opt/scrapbook-note/scrapbook-log.py /usr/bin/scrapbook-log  > /dev/null 2>&1 || echo
