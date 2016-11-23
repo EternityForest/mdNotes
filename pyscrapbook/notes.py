@@ -390,11 +390,11 @@ class Note(QWidget):
 
         if  util.striptrailingnumbers(self.path).endswith(".md"):
             with open(self.path,"wb") as f:
-                f.write(doc.markdown_github)
+                f.write(self.pre_bytes+doc.markdown_github)
 
         if  util.striptrailingnumbers(self.path).endswith(".rst"):
             with open(self.path,"wb") as f:
-                f.write(doc.rst)
+                f.write(self.pre_bytes+doc.rst)
 
         if buf and os.path.isfile(buf):
             os.remove(buf)
@@ -409,7 +409,19 @@ class Note(QWidget):
         if os.path.isfile(self.path):
             with open(self.path,"rb") as f:
                 s = f.read()
-            #now we are going to use pandoc to convert to html
+                print(s[:2])
+            #Be compatible with files made on a certain android text editor that puts those bytes there sometimes.
+            if s.startswith(b"\xff\xfe"):
+                s = s[2:]
+                self.pre_bytes = b"\xff\xfe"
+            elif s.startswith(b"\xfe\xff"):
+                s = s[2:]
+                self.pre_bytes = b"\xfe\xff"
+            elif s.startswith(b"\xef\xbb\xbf"):
+                s = s[3:]
+                self.pre_bytes = b"\xef\xbb\xbf"
+            else:
+                self.pre_bytes = b''            #now we are going to use pandoc to convert to html
             doc = pandoc.Document()
 
             #Figure out the input format. We back things up and archive them by appenting a Timestamp
@@ -452,7 +464,6 @@ class TxtNote(Note):
         QWidget.__init__(self)
         self.notebook = notebook
         self.path = path
-
         #Set up the embedded webkit
         self.edit = QTextEdit()
 
@@ -498,7 +509,7 @@ class TxtNote(Note):
                 shutil.copy(self.path,buf )
 
         with open(self.path,"wb") as f:
-            f.write(self.edit.toPlainText().encode("utf-8"))
+            f.write(self.pre_bytes+self.edit.toPlainText().encode("utf-8"))
 
         if buf and os.path.isfile(buf):
             os.remove(buf)
@@ -507,7 +518,20 @@ class TxtNote(Note):
         "Reload the file from disk"
         if os.path.isfile(self.path):
             with open(self.path,"rb") as f:
-                s = f.read().decode("utf-8")
+                s = f.read()
+                print(s[:2])
+            #Be compatible with files made on a certain android text editor that puts those bytes there sometimes.
+            if s.startswith(b"\xff\xfe"):
+                s = s[2:]
+                self.pre_bytes = b"\xff\xfe"
+            elif s.startswith(b"\xfe\xff"):
+                s = s[2:]
+                self.pre_bytes = b"\xfe\xff"
+            elif s.startswith(b"\xef\xbb\xbf"):
+                s = s[3:]
+                self.pre_bytes = b"\xef\xbb\xbf"
+            else:
+                self.pre_bytes = b''
             self.edit.setPlainText(s)
 
 
