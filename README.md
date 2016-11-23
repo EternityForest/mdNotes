@@ -99,7 +99,7 @@ scrapbook-log -project "Text" uses journal.md in the current directory, however 
 
 As entries are in the same format as described in the "Calendar" section above, entries will appear in the GUI app calendar if these files are placed in your notes directory.
 
-Scrapbook-log -set name "My Name" sets the configured name to name.
+Scrapbook-log -set name "My Name" sets the configured name to My Name.
 
 
 Formatting Examples

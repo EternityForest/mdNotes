@@ -409,7 +409,6 @@ class Note(QWidget):
         if os.path.isfile(self.path):
             with open(self.path,"rb") as f:
                 s = f.read()
-                print(s[:2])
             #Be compatible with files made on a certain android text editor that puts those bytes there sometimes.
             if s.startswith(b"\xff\xfe"):
                 s = s[2:]
@@ -519,7 +518,6 @@ class TxtNote(Note):
         if os.path.isfile(self.path):
             with open(self.path,"rb") as f:
                 s = f.read()
-                print(s[:2])
             #Be compatible with files made on a certain android text editor that puts those bytes there sometimes.
             if s.startswith(b"\xff\xfe"):
                 s = s[2:]
@@ -532,7 +530,7 @@ class TxtNote(Note):
                 self.pre_bytes = b"\xef\xbb\xbf"
             else:
                 self.pre_bytes = b''
-            self.edit.setPlainText(s)
+            self.edit.setPlainText(s.decode("utf-8"))
 
 
 class VirtualNote(Note):
