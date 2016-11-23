@@ -19,7 +19,7 @@
 from configparser import ConfigParser
 import sys,os
 notespath = None
-   
+
 def loadConfigFiles():
     "Given the notes path, attempt to loaf a config object from that notes path and the user's configured notes file"
     global config
@@ -47,43 +47,46 @@ def interpretPath(p):
     "Expand user and correectly resolve a path found in a config file"
     return os.path.join(os.path.dirname(os.path.realpath(__file__)),os.path.expanduser(p))
 
-#These functions work based on looking in a file called .mdnotes/notebooks.txt, which is just a list of filenames, one per line.
+def getConfiguredNotebook():
+    "Get the notebook file either from a config file or from the command line arg"
+    global notespath
+    p=None
+    if os.path.exists(os.path.expanduser("~/.mdnotes/notebooks.txt")):
+        p = os.path.expanduser("~/.mdnotes/notebooks.txt")
+    else:
+        if os.path.exists(os.path.expanduser("~/.mdnotes/notebooks.txt")+"~"):
+            p= os.path.expanduser("~/.mdnotes/notebooks.txt")+"~"
+
+    #If no config file and also no shell arg
+    if not p:
+        print("No notebooks.txt found")
+        notespath= os.getcwd()
+        return notespath
+
+    #Read the config
+    with open(p) as f:
+        t = f.read()
+
+    #Get the lines, but handle bizzare newline formats
+    t= t.replace("\r","").split("\n")
+
+    #Expand the user in the first line to get the absolute pathto the default notebook
+    np= os.path.join(os.path.expanduser(t[0]))
+
+    if np.endswith("/"):
+        notespath= np[:-1]
+    else:
+        notespath= np#These functions work based on looking in a file called .mdnotes/notebooks.txt, which is just a list of filenames, one per line.
+    return notespath
 #The first is the default notebooks directory.
 
 def getNotebookLocation():
-        "Get the notebook file either from a config file or from the command line arg"
-        p=None
-        if os.path.exists(os.path.expanduser("~/.mdnotes/notebooks.txt")):
-            p = os.path.expanduser("~/.mdnotes/notebooks.txt")
-        else:
-            if os.path.exists(os.path.expanduser("~/.mdnotes/notebooks.txt")+"~"):
-                p= os.path.expanduser("~/.mdnotes/notebooks.txt")+"~"
-
-
+        global notespath
         if not len(sys.argv)>1:
-            #If no config file and also no shell arg
-            if not p:
-                print("No notebooks.txt found")
-                return os.getcwd()
-
-            #Read the config
-            with open(p) as f:
-                t = f.read()
-
-            #Get the lines, but handle bizzare newline formats
-            t= t.replace("\r","").split("\n")
-
-            #Expand the user in the first line to get the absolute pathto the default notebook
-            np= os.path.join(os.path.expanduser(t[0]))
-
-            if np.endswith("/"):
-                return np[:-1]
-            else:
-                return np
+            notespath= getConfiguredNotebook()
         else:
-            return sys.argv[1] if os.path.exists(sys.argv[1]) else os.getcwd()
-
-notespath = getNotebookLocation()
+            notespath= sys.argv[1] if os.path.exists(sys.argv[1]) else os.getcwd()
+        return notespath
 
 def setNotebookLocation(l):
         "Set the default notebook file"

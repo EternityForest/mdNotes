@@ -39,22 +39,6 @@ You can then use File&gt;Open Notebook Folder to open the folder you want to kee
 
 Or, alternatively, cd into packaging and use "fakeroot make" to build a debian package.
 
-Command Line Usage
-------------------
-
-If you install the package, you can start the app with the command "scrapbook".
-The file scrapbook-log.py(available as scrapbook-log if you use the debiain installer) is a very simple command line program to append a level 2 heading containing a timestamp, plus a short block of text, to a journal.
-
-Typing "scrapbook-log "Text" will append the timestamp heading plus "text" to a file journal.md in the root of your notes folder
-
-Typing scrapbook-log journalname "Text" will append text to a file journalname.md in the root of your notes folder.
-
-Typing scrapbook-log -here "Text" will append text to a file journal.md in the current working dir.
-Typing scrapbook-log file.md "Text" appends to file.md in the current directory.
-
-scrapbook-log -project "Text" uses journal.md in the current directory, however it will also add your name.
-
-Scrapbook-log -set name "My Name" sets the configured name to name.
 
 Config Files
 ------------
@@ -84,13 +68,39 @@ You can also put a global theme in ~/.mdnotes/style.css, however themes directly
 Calendar
 --------
 To mark a file as containing calendar entries, just put a 4 digit year in the top heading(If there are multiple, the first gets used).
+The file can contain other text, so long as there is at least 1 4 digit year. An example would be "# Journal 2016"
 
-Then, each day can be recorded as a second level heading like "June 3".
+Only .md markdown files are supported for the calendar feature.
+
+Each day should be recorded as a second level heading like "June 3".
 
 Events at specific times are third level headings, like "22:50" or "3pm" or "2:30am".
 
 Clicking tools>show calendar will show you all of the entries, past and future, organized by month. Double clicking an entry will
-take you directly to the file it came from.s
+take you directly to the file it came from.
+
+Command Line Journaling
+------------------
+If you install the Debian package, you can start the GUI app with the command "scrapbook"
+
+The file scrapbook-log.py(available as scrapbook-log if you use the Debiain installer) is a very simple command line program to append a level 2 heading containing the date(Unless the most recent entry is on the same day), a level 3 heading containing the time, plus a short block of text, to a journal.
+
+Typing "scrapbook-log "Text" will append the timestamp headings plus "text" to a file journal.md in the root of your notes folder
+
+Typing scrapbook-log journalname "Text" will append text to a file journalname.md in the root of your notes folder.
+
+Typing scrapbook-log -here "Text" will append text to a file journal.md in the current working directory.
+
+Typing scrapbook-log file.md "Text" appends to file.md in the current directory.
+
+scrapbook-log -project "Text" uses journal.md in the current directory, however it will also add your name.
+
+*Note:* In all of these cases, the journal file must already exist, and must have at least the top-level heading containing a 4-digit year that marks files as calendar files, and must have at least one entry already entered in manually.
+
+As entries are in the same format as described in the "Calendar" section above, entries will appear in the GUI app calendar if these files are placed in your notes directory.
+
+Scrapbook-log -set name "My Name" sets the configured name to name.
+
 
 Formatting Examples
 -------------------
