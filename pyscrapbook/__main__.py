@@ -365,7 +365,7 @@ class Browser(QWidget):
                 newp = os.path.join(path,text+".md")
                 if ok and not os.path.exists(newp):
                     with open(newp, "w") as f:
-                        f.write("# Heading\ntext content")
+                        f.write("# "+notes.capitalize(text)+"\ntext content")
                 self.nb.open(newp)
 
         #User has chosen to create file

@@ -340,7 +340,7 @@ class Note(QWidget):
             #Watch the file so we can auto reload
             self.watcher = QFileSystemWatcher()
             self.watcher.addPath(self.path)
-            self.watcher.fileChanged.connect(self.reload)
+            self.watcher.fileChanged.connect(self.onChanged)
 
         #from http://ralsina.me/weblog/posts/BB948.html
         #Add a search feature
@@ -398,6 +398,16 @@ class Note(QWidget):
 
         if buf and os.path.isfile(buf):
             os.remove(buf)
+    def onChanged(self):
+        self.reload()
+        #Three sleeps, really be sure the other process has put the file back.
+        #See http://stackoverflow.com/questions/18300376/qt-qfilesystemwatcher-signal-filechanged-gets-emited-only-once
+        time.sleep(0.01)
+        time.sleep(0.01)
+        time.sleep(0.01)
+
+        self.watcher.addPath(self.path)
+
 
     def reload(self,dummy=True):
         "Reload the file from disk"
