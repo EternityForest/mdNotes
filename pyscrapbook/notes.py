@@ -362,11 +362,12 @@ class Note(QWidget):
         self.watcher.removePath(self.path)
         self.save()
 
-    def save(self):
+    def save(self,name=None):
+        name=name or self.path
         #Readonly html file support
-        if self.path.endswith(".ro"):
+        if name.endswith(".ro"):
             return
-        if self.path.endswith(".html"):
+        if name.endswith(".html"):
             return
         "Save the file if it needs saving"
         if not self.edit.page().isModified():
@@ -375,30 +376,40 @@ class Note(QWidget):
         #Back Up File
         buf =None
         #If the file exists, copy it to file~ first. If that exists, copy it to file4857475928345
-        if os.path.exists(self.path):
-            if not os.path.exists(self.path+"~"):
-                buf=(self.path+"~")
-                shutil.copy(self.path, self.path+"~")
+        if os.path.exists(name):
+            if not os.path.exists(name+"~"):
+                buf=(name+"~")
+                shutil.copy(name, name+"~")
             else:
-                buf = self.path+str(time.time())
-                shutil.copy(self.path,buf )
+                buf = name+str(time.time())
+                shutil.copy(name,buf )
 
         #Again, pandoc to convert to the proper format
         doc = pandoc.Document()
-        h = downloadAllImages(self.edit.page().mainFrame().toHtml(),self.path)
+        h = downloadAllImages(self.edit.page().mainFrame().toHtml(),name)
         doc.html = destyle_html(h).encode("utf-8")
 
-        if  util.striptrailingnumbers(self.path).endswith(".md"):
-            with open(self.path,"wb") as f:
+        if  util.striptrailingnumbers(name).endswith(".md"):
+            with open(name,"wb") as f:
                 f.write(self.pre_bytes+doc.markdown_github)
 
-        if  util.striptrailingnumbers(self.path).endswith(".rst"):
-            with open(self.path,"wb") as f:
+        if  util.striptrailingnumbers(name).endswith(".rst"):
+            with open(name,"wb") as f:
                 f.write(self.pre_bytes+doc.rst)
 
         if buf and os.path.isfile(buf):
             os.remove(buf)
+
+        #Reload to mark as saved, before the filesystem watcher ca get to it.
+        self.reload()
+
+
     def onChanged(self):
+        "Handle change in the filesystem"
+
+        #Never let an external change completely destroy our work.
+        self.save(self.path+str(time.time()))
+
         self.reload()
         #Three sleeps, really be sure the other process has put the file back.
         #See http://stackoverflow.com/questions/18300376/qt-qfilesystemwatcher-signal-filechanged-gets-emited-only-once
