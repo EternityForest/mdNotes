@@ -30,7 +30,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
 from PyQt5 import QtCore
 
-import config, styles,util
+import config, styles,util,calendar_entries
 
 
 from html.parser import HTMLParser
@@ -236,8 +236,38 @@ class NoteToolBar(QWidget):
             self.lo2.addWidget(self.ul)
 
             def Timestamp(d):
-                t =datetime.datetime.now().strftime(config.config.get("basic", "strftime",raw=True))
-                self.edit.page().mainFrame().evaluateJavaScript('document.execCommand("insertHTML",false,"' +t+ '");' )
+                #Return list of tuples of time, text of entry
+                ce=calendar_entries.get_calendar_entries(None, self.note.to_gfm())
+                #get the datetime of the last entry
+                if ce and not (config.config.get("basic", "timestamp_button") == "basic"):
+                    last = ce[-1][0]
+                else:
+                    t =datetime.datetime.now().strftime(config.config.get("basic", "strftime",raw=True))
+                    self.edit.page().mainFrame().evaluateJavaScript('document.execCommand("insertHTML",false,"' +t+ '");' )
+                    return
+
+
+                now = datetime.datetime.now()
+                d="\n"
+
+                #Only put the time if we can help it, otherwise out the date on an l2 heading.
+                if not(now.year==last.year and now.day==last.day and now.month==last.month):
+                    #d is the data variable that always begins with a # indicating an MD heading and the current time.
+                    d = "<h2>" +datetime.datetime.now().strftime('%B %d')+"</h2>"
+                    d+= '<h3>' + datetime.datetime.now().strftime('%I:%M%p')+"</h3>"
+
+                #Don't put another heading at all if the new entry is within 3 minutes of the last one
+                elif (now-last)>datetime.timedelta(minutes=3):
+                    d+=  "<h3>"+ datetime.datetime.now().strftime('%I:%M%p')+"</h3>"
+
+                self.edit.page().mainFrame().evaluateJavaScript('document.execCommand("insertHTML",false,"' +d+ '");' )
+
+
+
+
+
+
+
             self.ts = QPushButton("Timestamp")
             self.ts.clicked.connect(Timestamp)
             self.lo2.addWidget(self.ts)
@@ -361,6 +391,11 @@ class Note(QWidget):
         "Handle closing the tab or the whole program"
         self.watcher.removePath(self.path)
         self.save()
+
+    def to_gfm(self):
+        doc = pandoc.Document()
+        doc.html = destyle_html(self.edit.page().mainFrame().toHtml()).encode("utf-8")
+        return doc.markdown_github.decode("utf-8")
 
     def save(self,name=None):
         name=name or self.path

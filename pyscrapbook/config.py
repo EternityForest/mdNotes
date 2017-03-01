@@ -26,6 +26,7 @@ def loadConfigFiles():
     default="""
     [basic]
     strftime = %b %d %I:%M%p %G
+    timestamp_button = h2h3
     [theme]
     css = ~/.mdnotes/style.css
 

@@ -57,7 +57,7 @@ def has_date(s):
         return year, month, day
 
 
-def get_calendar_entries(fn):
+def get_calendar_entries(fn,s=None):
     """Given a file, return all of the calendar entries, which are simply text under a heading with the date.
        Headings are nestable,l1 should have a 4 digit year.
        l2 headings should contain the date and l3 the time, however this function ignore exactly what the headings are and tries
@@ -65,16 +65,19 @@ def get_calendar_entries(fn):
     """
     #Check for a 4-digit year at some point in the first 4096 characters of the file. If there is not at least one,
     #Then assume this is not actually a journal file.
-    with open(fn,'rb') as f:
-        s = f.read(4096).decode(errors="surrogateescape")
-        if not re.search(r"\d\d\d\d",s):
-            return([])
+    if fn:
+        with open(fn,'rb') as f:
+            s = f.read(4096).decode(errors="surrogateescape")
 
-    #Limit files to 4MB, that really should be enough for any journal file.
-    with open(fn,'rb') as f:
-        s = f.read(4*10**6).decode(errors="surrogateescape")
+    if not re.search(r"\d\d\d\d",s):
+        return([])
+    if fn:
+        #Limit files to 4MB, that really should be enough for any journal file.
+        with open(fn,'rb') as f:
+            s = f.read(4*10**6).decode(errors="surrogateescape")
+            n = os.path.basename(fn).replace("\r","")
+
     s = s.lower()
-    n = os.path.basename(fn).replace("\r","")
     o =''
     t = s.split("\n")
     y=m=d=h=mm =None
@@ -128,7 +131,7 @@ def get_calendar_entries(fn):
         try:
             if this_entry:
                 e.append((datetime.datetime(y,m,d,h,mm),this_entry,fn))
-        except( TypeError, ValueError):
+        except( TypeError, ValueError) as e:
             pass
     return e
 
